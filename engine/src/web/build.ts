@@ -86,6 +86,7 @@ export async function exportWeb(dirArg?: string, outArg?: string): Promise<void>
     `runStory({`,
     `  title: ${JSON.stringify(config.name ?? 'Milkshake Story')},`,
     `  start: ${JSON.stringify(config.start ?? 'Start')},`,
+    ...(config.uid ? [`  uid: ${JSON.stringify(config.uid)},`] : []),
     ...(hasVars ? [`  vars: __vars,`] : []),
     ...(layoutFile ? [`  layout: __layout,`] : []),
     `  passages: ${JSON.stringify(passages)},`,

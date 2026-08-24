@@ -9,13 +9,26 @@ import type { Engine, StoryContext } from '../../engine/src/index.js';
  * 不触碰引擎源码，仅复用其公开 API（Engine.state、Engine.renderCurrent）。
  *
  * 存储布局（localStorage）：
- *   - `milkshake-saves`        JSON 数组：所有存档位的元信息（id / label / savedAt / passage）
- *   - `milkshake-save:<id>`    单个存档位的完整 SaveData
+ *   - `milkshake:<story>:saves`       JSON 数组：该故事所有存档位的元信息（id / label / savedAt / passage）
+ *   - `milkshake:<story>:save:<id>`   单个存档位的完整 SaveData
+ * 其中 `<story>` 取 `engine.options.uid`（story.config.ts 里的故事 GUID，稳定），缺省回退故事名，
+ * 保证不同故事互不串档。
  */
 
-const REGISTRY_KEY = 'milkshake-saves';
-const SLOT_PREFIX = 'milkshake-save:';
 const VERSION = 1;
+
+/** 故事命名空间：优先稳定 GUID，缺省回退故事名。 */
+function storyKey(engine: Engine<object>): string {
+  return engine.options.uid || engine.options.name || 'default';
+}
+
+function keysFor(engine: Engine<object>): { registry: string; slot: (id: string) => string } {
+  const ns = storyKey(engine);
+  return {
+    registry: `milkshake:${ns}:saves`,
+    slot: (id: string) => `milkshake:${ns}:save:${id}`,
+  };
+}
 
 export interface SaveMeta {
   id: string;
@@ -35,9 +48,10 @@ export interface SaveData<T extends object> extends SaveMeta {
 
 /* ---------------- 存储底层 ---------------- */
 
-function readRegistry(): SaveMeta[] {
+function readRegistry(engine: Engine<object>): SaveMeta[] {
+  const { registry } = keysFor(engine);
   try {
-    const raw = localStorage.getItem(REGISTRY_KEY);
+    const raw = localStorage.getItem(registry);
     if (!raw) return [];
     const arr = JSON.parse(raw) as unknown;
     return Array.isArray(arr) ? (arr as SaveMeta[]) : [];
@@ -46,21 +60,22 @@ function readRegistry(): SaveMeta[] {
   }
 }
 
-function writeRegistry(meta: SaveMeta[]) {
+function writeRegistry(engine: Engine<object>, meta: SaveMeta[]) {
+  const { registry } = keysFor(engine);
   try {
-    localStorage.setItem(REGISTRY_KEY, JSON.stringify(meta));
+    localStorage.setItem(registry, JSON.stringify(meta));
   } catch {
     // 隐私模式等场景下可能失败，忽略。
   }
 }
 
 /** 列出全部存档位（按保存时间从新到旧）。 */
-export function listSaves(): SaveMeta[] {
-  return readRegistry().sort((a, b) => b.savedAt - a.savedAt);
+export function listSaves(engine: Engine<object>): SaveMeta[] {
+  return readRegistry(engine).sort((a, b) => b.savedAt - a.savedAt);
 }
 
-export function hasSave(): boolean {
-  return listSaves().length > 0;
+export function hasSave(engine: Engine<object>): boolean {
+  return listSaves(engine).length > 0;
 }
 
 /** 生成一个唯一的存档位 id。 */
@@ -78,7 +93,8 @@ function newId(): string {
  */
 export function saveGame<T extends object>(engine: Engine<T>, id?: string): SaveData<T> {
   const st = engine.state;
-  const meta = readRegistry();
+  const { slot } = keysFor(engine);
+  const meta = readRegistry(engine);
 
   let slotId = id;
   if (!slotId || !meta.some(m => m.id === slotId)) slotId = newId();
@@ -100,7 +116,7 @@ export function saveGame<T extends object>(engine: Engine<T>, id?: string): Save
   };
 
   try {
-    localStorage.setItem(SLOT_PREFIX + slotId, JSON.stringify(data));
+    localStorage.setItem(slot(slotId), JSON.stringify(data));
   } catch {
     // 忽略写入失败。
   }
@@ -109,16 +125,17 @@ export function saveGame<T extends object>(engine: Engine<T>, id?: string): Save
   const entry: SaveMeta = { id: slotId, label, savedAt: data.savedAt, passage: data.passage };
   if (idx >= 0) meta[idx] = entry;
   else meta.push(entry);
-  writeRegistry(meta);
+  writeRegistry(engine, meta);
 
   return data;
 }
 
 /** 从指定存档位读取并写回引擎状态。返回是否成功。 */
 export function loadGame<T extends object>(engine: Engine<T>, id: string): boolean {
+  const { slot } = keysFor(engine);
   let raw: string | null = null;
   try {
-    raw = localStorage.getItem(SLOT_PREFIX + id);
+    raw = localStorage.getItem(slot(id));
   } catch {
     return false;
   }
@@ -143,16 +160,17 @@ export function loadGame<T extends object>(engine: Engine<T>, id: string): boole
 }
 
 /** 删除指定存档位。返回是否删除成功。 */
-export function deleteSave(id: string): boolean {
+export function deleteSave(engine: Engine<object>, id: string): boolean {
+  const { slot } = keysFor(engine);
   let existed = false;
   try {
-    localStorage.removeItem(SLOT_PREFIX + id);
-    existed = localStorage.getItem(SLOT_PREFIX + id) === null;
+    localStorage.removeItem(slot(id));
+    existed = localStorage.getItem(slot(id)) === null;
   } catch {
     return false;
   }
-  const meta = readRegistry().filter(m => m.id !== id);
-  writeRegistry(meta);
+  const meta = readRegistry(engine).filter(m => m.id !== id);
+  writeRegistry(engine, meta);
   return existed;
 }
 
@@ -172,10 +190,10 @@ export function install(ctx: StoryContext) {
     name: 'save',
     run: () => {
       const d = saveGame(ctx.engine);
-      return `\n💾 已存档（${d.label}，${new Date(d.savedAt).toLocaleTimeString()}）。当前共 ${listSaves().length} 个存档位。`;
+      return `\n💾 已存档（${d.label}，${new Date(d.savedAt).toLocaleTimeString()}）。当前共 ${listSaves(ctx.engine).length} 个存档位。`;
     },
   });
 
-  ctx.registerHelper('hasSave', () => hasSave());
-  ctx.registerHelper('saves', () => listSaves());
+  ctx.registerHelper('hasSave', () => hasSave(ctx.engine));
+  ctx.registerHelper('saves', () => listSaves(ctx.engine));
 }

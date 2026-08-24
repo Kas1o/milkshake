@@ -9,6 +9,8 @@ export interface StoryOptions<T extends object = Vars> {
   name?: string;
   start?: string;
   transpile?: boolean;
+  /** Stable per-story identifier (from story.config.ts) for namespacing e.g. saves. */
+  uid?: string;
   /** Default story variables; cloned into state on start and reset. */
   vars?: T;
 }

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, basename, join } from 'node:path';
@@ -20,7 +21,7 @@ export interface InitOptions {
   interactive?: boolean;
 }
 
-/** 用 story 标题替换复制产物里的占位名。 */
+/** 用 story 标题替换复制产物里的占位名，并写入一个稳定的故事 GUID。 */
 async function applyTitle(dir: string, title: string): Promise<void> {
   const lit = JSON.stringify(title);
   const cfg = join(dir, 'story.config.ts');
@@ -33,6 +34,15 @@ async function applyTitle(dir: string, title: string): Promise<void> {
   const ui = join(dir, 'passages', '00_ui.mksk');
   const uiText = (await readFile(ui, 'utf8')).replace('新的奶昔故事', title);
   await writeFile(ui, uiText, 'utf8');
+}
+
+/** 为 story.config.ts 追加一个稳定的故事 GUID（存档命名空间用）。 */
+async function applyUid(dir: string): Promise<void> {
+  const cfg = join(dir, 'story.config.ts');
+  const text = await readFile(cfg, 'utf8');
+  if (/\buid\s*:/.test(text)) return;
+  const lit = JSON.stringify(randomUUID());
+  await writeFile(cfg, text.replace(/\}(\s*;?)\s*$/, `  uid: ${lit},\n}$1`), 'utf8');
 }
 
 /** 从内置模板初始化一个新的故事项目，并按需装配基础设施模块。 */
@@ -77,6 +87,7 @@ export async function initProject(target: string | InitOptions): Promise<void> {
   await mkdir(dir, { recursive: true });
   await cp(template, dir, { recursive: true });
   await applyTitle(dir, title);
+  await applyUid(dir);
 
   const modules: InfraModule[] = ids.length ? await resolveModules(ids) : [];
   const errors = await applyModules(dir, modules);

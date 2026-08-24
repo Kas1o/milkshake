@@ -124,7 +124,7 @@ function rewriteRelativeSpecifiers(output: string, file: string): string {
 
 export async function loadConfig(
   dir: string,
-): Promise<{ name?: string; start?: string }> {
+): Promise<{ name?: string; start?: string; uid?: string }> {
   try {
     const mod = await importTsFile(join(dir, 'story.config.ts'));
     return mod.default ?? {};

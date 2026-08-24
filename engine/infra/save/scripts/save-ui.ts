@@ -9,11 +9,11 @@
  * 本文件不 import 引擎，使用结构类型，可在任意项目布局中复用。
  */
 
-import { saveGame, loadGame, deleteSave, listSaves } from './save-system.js';
+import { saveGame, loadGame, deleteSave, listSaves, type EngineLike } from './save-system.js';
 
 /** 只声明用到的控制器字段，保持对 StoryController 的结构兼容。 */
 interface CtrlLike {
-  engine: { renderCurrent(): Promise<unknown> };
+  engine: EngineLike & { renderCurrent(): Promise<unknown> };
 }
 type Repaint = (result: unknown) => Promise<void> | void;
 
@@ -32,7 +32,7 @@ function openSavesPanel(ctrl: CtrlLike, repaint: Repaint) {
 
   function renderList() {
     list.innerHTML = '';
-    const saves = listSaves();
+    const saves = listSaves(ctrl.engine);
     if (!saves.length) {
       const li = document.createElement('li');
       li.className = 'save-empty';
@@ -50,7 +50,7 @@ function openSavesPanel(ctrl: CtrlLike, repaint: Repaint) {
       loadBtn.type = 'button';
       loadBtn.textContent = '读档';
       loadBtn.addEventListener('click', async () => {
-        if (!loadGame(ctrl.engine as never, s.id)) return;
+        if (!loadGame(ctrl.engine, s.id)) return;
         overlay.remove();
         await repaint(await ctrl.engine.renderCurrent());
       });
@@ -60,7 +60,7 @@ function openSavesPanel(ctrl: CtrlLike, repaint: Repaint) {
       delBtn.className = 'save-delete';
       delBtn.textContent = '删除';
       delBtn.addEventListener('click', () => {
-        deleteSave(s.id);
+        deleteSave(ctrl.engine, s.id);
         renderList();
       });
 
@@ -91,8 +91,8 @@ export function initSaveUI(ctrl: CtrlLike, repaint: Repaint): void {
   if (saveBtn) {
     saveBtn.addEventListener('click', ev => {
       ev.preventDefault();
-      const d = saveGame(ctrl.engine as never);
-      alert(`已新建存档：${d.label}（${new Date(d.savedAt).toLocaleTimeString()}）。当前共 ${listSaves().length} 个存档位。`);
+      const d = saveGame(ctrl.engine);
+      alert(`已新建存档：${d.label}（${new Date(d.savedAt).toLocaleTimeString()}）。当前共 ${listSaves(ctrl.engine).length} 个存档位。`);
     });
   }
 
@@ -100,7 +100,7 @@ export function initSaveUI(ctrl: CtrlLike, repaint: Repaint): void {
   if (loadBtn) {
     loadBtn.addEventListener('click', ev => {
       ev.preventDefault();
-      if (!listSaves().length) {
+      if (!listSaves(ctrl.engine).length) {
         alert('还没有任何存档，先点「存档」创建一个吧。');
         return;
       }
@@ -108,3 +108,4 @@ export function initSaveUI(ctrl: CtrlLike, repaint: Repaint): void {
     });
   }
 }
+

@@ -29,6 +29,7 @@ export interface StoryLayout {
 export interface StoryBundle {
   title?: string;
   start?: string;
+  uid?: string;
   vars?: Vars;
   passages: import('../types.js').PassageSource[];
   install: (ctx: ReturnType<typeof makeContext>) => Promise<void>;
@@ -53,6 +54,7 @@ export async function runStory(bundle: StoryBundle): Promise<void> {
   const engine = new Engine({
     name: bundle.title ?? 'Milkshake Story',
     start: bundle.start ?? 'Start',
+    uid: bundle.uid,
     vars: bundle.vars,
   });
   engine.ask = async prompt => window.prompt(prompt) ?? '';

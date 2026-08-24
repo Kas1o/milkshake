@@ -42,7 +42,7 @@ interface RendCollector {
 type MacroNode = Extract<Node, { kind: 'macro' }>;
 
 export class Engine<T extends object = Vars> {
-  readonly options: { name: string; start: string; transpile: boolean };
+  readonly options: { name: string; start: string; transpile: boolean; uid?: string };
   state: StoryState<T>;
   pendingNav: string | null = null;
   ask?: (prompt: string) => Promise<string>;
@@ -63,6 +63,7 @@ export class Engine<T extends object = Vars> {
       name: options.name ?? 'Milkshake Story',
       start: options.start ?? 'Start',
       transpile: options.transpile ?? true,
+      uid: options.uid,
     };
     this.defaultVars = options.vars;
     this.state = new StoryState<T>(this.freshVars());

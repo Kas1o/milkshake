@@ -18,7 +18,7 @@ function openSavesPanel(c: StoryController) {
 
   function renderList() {
     list.innerHTML = '';
-    const saves = listSaves();
+    const saves = listSaves(c.engine);
     if (!saves.length) {
       const li = document.createElement('li');
       li.className = 'save-empty';
@@ -46,7 +46,7 @@ function openSavesPanel(c: StoryController) {
       delBtn.className = 'save-delete';
       delBtn.textContent = '删除';
       delBtn.addEventListener('click', () => {
-        deleteSave(s.id);
+        deleteSave(c.engine, s.id);
         renderList();
       });
 
@@ -106,13 +106,13 @@ export const layout: StoryLayout = {
     document.getElementById('menu-save')!.addEventListener('click', ev => {
       ev.preventDefault();
       const d = saveGame(c.engine);
-      alert(`已新建存档：${d.label}（${new Date(d.savedAt).toLocaleTimeString()}）。当前共 ${listSaves().length} 个存档位。`);
+      alert(`已新建存档：${d.label}（${new Date(d.savedAt).toLocaleTimeString()}）。当前共 ${listSaves(c.engine).length} 个存档位。`);
     });
 
     // 读档：打开面板，从任意存档位恢复并重绘当前段落。
     document.getElementById('menu-load')!.addEventListener('click', ev => {
       ev.preventDefault();
-      if (!listSaves().length) {
+      if (!listSaves(c.engine).length) {
         alert('还没有任何存档，先点「存档」创建一个吧。');
         return;
       }
@@ -177,3 +177,4 @@ export const layout: StoryLayout = {
     if (old) setTimeout(() => old.remove(), 400);
   },
 };
+

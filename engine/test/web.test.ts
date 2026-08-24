@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { initProject } from '../src/web/init.js';
 import { loadInfraModules, resolveModules, applyModules } from '../src/web/infra.js';
 import { isSpecialScript, isStoryRoot, resolveStoryDir } from '../src/engine/story.js';
+import { createEngine } from '../src/index.js';
+import { saveGame, loadGame, listSaves } from '../../story/scripts/save-system.js';
 import { checkStory } from '../src/check.js';
 
 test('initProject copies the default project template', async () => {
@@ -113,6 +115,56 @@ test('applyModules reports a missing anchor instead of silently skipping', async
     const errors = await applyModules(dir, broken);
     assert.equal(errors.length, 1);
     assert.match(errors[0], /anchor 未命中/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('save slots are isolated per story uid', () => {
+  const store = new Map<string, string>();
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+    setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+    key: (i: number) => [...store.keys()][i] ?? null,
+    get length() {
+      return store.size;
+    },
+  };
+
+  const mk = (uid: string) => {
+    const e = createEngine({ uid });
+    e.state.variables = { gold: 0, day: 1, inventory: [] } as never;
+    e.state.current = 'Village';
+    return e;
+  };
+
+  const a = mk('uid-story-a');
+  const b = mk('uid-story-b');
+  const sa = saveGame(a);
+  const sb = saveGame(b);
+
+  // 各自只看到自己的存档。
+  assert.equal(listSaves(a).length, 1);
+  assert.equal(listSaves(b).length, 1);
+  assert.notEqual(sa.id, sb.id);
+
+  // 跨故事读不到对方的存档。
+  assert.equal(loadGame(a, sb.id), false, '故事 A 不应读到故事 B 的存档');
+  assert.equal(loadGame(b, sa.id), false, '故事 B 不应读到故事 A 的存档');
+  assert.equal(loadGame(a, sa.id), true);
+  assert.equal(loadGame(b, sb.id), true);
+});
+
+test('story.config.ts gets a uid when the wizard creates a project', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'milkshake-new-'));
+  try {
+    await initProject({ dir, title: 'GUID 测试' });
+    const cfg = await readFile(join(dir, 'story.config.ts'), 'utf8');
+    assert.match(cfg, /\buid:\s*"/);
+    const m = cfg.match(/uid:\s*"([^"]+)"/);
+    assert.ok(m && m[1].length > 0);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

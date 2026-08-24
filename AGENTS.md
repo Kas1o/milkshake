@@ -81,7 +81,7 @@ ${gold}                      // 表达式插值
 ## 故事项目约定（story/）
 
 - `story/vars.ts`：**故事变量的唯一声明处**（类型 + 默认值，`export default`）。开局与「重新开始」时深拷贝默认值；**向未声明变量赋值会直接抛错**（`engine/src/engine/expr.ts` 的 `createScope.set`）。新增故事变量必须同时在这里补类型与默认值。
-- `story/story.config.ts`：`export default { name, start }`。
+- `story/story.config.ts`：`export default { name, start, uid }`。`uid` 是故事稳定标识（`npm run new` 生成），经 build 注入 `engine.options.uid`，用于存档等按故事隔离（缺省回退故事名）。
 - `story/package.json`：`{ "type": "module" }`。**脚本之间做运行时 import 时必须要有**（没有的话 Node 按 CJS 处理 `.ts`，默认导入会被 interop 包一层）。
 - `story/scripts/*.ts`：导出 `install(ctx: StoryContext)` 的脚本是宏 / 助手 / 钩子安装器（`ctx.registerMacro`、`ctx.registerHelper`、`ctx.on`），会被 check / build 单独收集；**没有 `install` 的辅助模块**（如 `battle-window.ts`）只作为它们的 import 依赖存在。加载时排除 `story.config.ts`、`vars.ts` 与 `layout.ts`（`isSpecialScript`）。
 - `story/scripts/layout.ts`：**页面布局**（默认 UI 的起点）。导出 `const layout: StoryLayout`（`init` 构建 DOM / 绑定控件、`render` 绘制段落），`build.ts` 会把该对象注入 `runStory`。不写 `install`。
