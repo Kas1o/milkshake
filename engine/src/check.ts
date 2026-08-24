@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -46,7 +46,7 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
 
   // Install story scripts against a throwaway engine to learn helper names
   // and script-registered block macros (e.g. <<enemy>>) before parsing.
-  const scriptInfo = await collectScriptInfo(dir);
+  const scriptInfo = await cachedScriptInfo(dir);
   const blockMacros = new Set([...CORE_BLOCK_MACROS, ...scriptInfo.blockMacros]);
 
   const parsed = new Map<string, Node[]>();
@@ -234,7 +234,7 @@ export async function collectStoryInfo(dir: string): Promise<StoryInfo> {
   }
   const titles = new Set(sources.map(s => s.title));
   const locations = passageLocations(sources);
-  const scriptInfo = await collectScriptInfo(dir);
+  const scriptInfo = await cachedScriptInfo(dir);
   const blockMacros = new Set([...CORE_BLOCK_MACROS, ...scriptInfo.blockMacros]);
   const widgets = new Map<string, string[]>();
   for (const s of sources) {
@@ -281,11 +281,46 @@ function forLoopVar(args: string): string | undefined {
   return m2 ? m2[1] : undefined;
 }
 
+interface CollectedScriptInfo {
+  helpers: Set<string>;
+  macros: Set<string>;
+  blockMacros: Set<string>;
+}
+
+/** Importing + executing every story script is expensive (transpile + data-URL
+ * import + module side effects). Scripts rarely change while editing `.mksk`,
+ * so cache the result keyed by a fingerprint of the relevant TS files' mtimes. */
+const scriptInfoCache = new Map<string, { key: string; info: CollectedScriptInfo }>();
+
+async function cachedScriptInfo(dir: string): Promise<CollectedScriptInfo> {
+  let key = '';
+  try {
+    const files = await walk(dir, p => /\.ts$/i.test(p) && !isSpecialScript(p));
+    const mtimes = await Promise.all(
+      files.map(async f => {
+        try {
+          const st = await stat(f);
+          return `${f}:${st.mtimeMs}`;
+        } catch {
+          return `${f}:missing`;
+        }
+      }),
+    );
+    key = mtimes.sort().join('|');
+  } catch {
+    // Fall back to a stable key so the cache is simply never reused.
+    key = `${dir}:unreadable`;
+  }
+  const hit = scriptInfoCache.get(dir);
+  if (hit && hit.key === key) return hit.info;
+  const info = await collectScriptInfo(dir);
+  scriptInfoCache.set(dir, { key, info });
+  return info;
+}
+
 /** Install story scripts against a throwaway engine to learn helper names
  * and script-registered macros (block ones affect parsing, e.g. <<enemy>>). */
-async function collectScriptInfo(
-  dir: string,
-): Promise<{ helpers: Set<string>; macros: Set<string>; blockMacros: Set<string> }> {
+async function collectScriptInfo(dir: string): Promise<CollectedScriptInfo> {
   const helpers = new Set<string>();
   const macros = new Set<string>();
   const blockMacros = new Set<string>();

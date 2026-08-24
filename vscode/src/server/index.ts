@@ -11,6 +11,7 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { findStoryRoot } from '../shared/locate.js';
 import { computeDiagnostics } from './diagnostics.js';
+import { cachedStoryInfo } from './storyInfo.js';
 import { completeAt } from './completion.js';
 import { definitionAt } from './definition.js';
 
@@ -19,6 +20,12 @@ const documents = new TextDocuments(TextDocument);
 
 const debounceTimers = new Map<string, NodeJS.Timeout>();
 let lastDiagnosed: Set<string> = new Set();
+
+// Serializes the (expensive) whole-project check: if a refresh is in flight and
+// a newer edit lands, the newest request wins and stale runs are discarded, so
+// the server never falls further and further behind ("反应迟钝/不更新").
+let runToken = 0;
+let running = Promise.resolve();
 
 connection.onInitialize((_params: InitializeParams) => ({
   capabilities: {
@@ -32,26 +39,36 @@ function scheduleDiagnostics(doc: TextDocument) {
   const uri = doc.uri;
   const old = debounceTimers.get(uri);
   if (old) clearTimeout(old);
-  debounceTimers.set(uri, setTimeout(() => void refreshDiagnostics(doc), 300));
+  debounceTimers.set(uri, setTimeout(() => void refreshDiagnostics(doc), 500));
 }
 
 /** The checker runs per story root, so every refresh re-reports all files. */
 async function refreshDiagnostics(doc: TextDocument) {
-  for (const uri of lastDiagnosed) {
-    connection.sendDiagnostics({ uri, diagnostics: [] });
-  }
-  lastDiagnosed = new Set();
+  const token = ++runToken;
   const root = findStoryRoot(fileURLToPath(doc.uri));
   if (!root) return;
-  try {
-    const byFile = await computeDiagnostics(root);
-    for (const [uri, diagnostics] of byFile) {
-      connection.sendDiagnostics({ uri, diagnostics });
-      lastDiagnosed.add(uri);
-    }
-  } catch (err) {
-    connection.console.error(`Milkshake check failed: ${err}`);
-  }
+  running = running
+    .then(async () => {
+      // A newer edit superseded this run while it was queued.
+      if (token !== runToken) return;
+      let byFile: Awaited<ReturnType<typeof computeDiagnostics>> | undefined;
+      try {
+        byFile = await computeDiagnostics(root);
+      } catch (err) {
+        connection.console.error(`Milkshake check failed: ${err}`);
+        return;
+      }
+      if (token !== runToken) return; // superseded during the check itself
+      for (const uri of lastDiagnosed) {
+        connection.sendDiagnostics({ uri, diagnostics: [] });
+      }
+      lastDiagnosed = new Set();
+      for (const [uri, diagnostics] of byFile) {
+        connection.sendDiagnostics({ uri, diagnostics });
+        lastDiagnosed.add(uri);
+      }
+    })
+    .catch(err => connection.console.error(`Milkshake check failed: ${err}`));
 }
 
 documents.onDidOpen(e => scheduleDiagnostics(e.document));
@@ -68,7 +85,7 @@ connection.onCompletion(async (params: CompletionParams) => {
   const root = findStoryRoot(fileURLToPath(doc.uri));
   if (!root) return [];
   try {
-    return await completeAt(root, doc, params.position);
+    return await completeAt(doc, params.position, await cachedStoryInfo(root));
   } catch (err) {
     connection.console.error(`Milkshake completion failed: ${err}`);
     return [];

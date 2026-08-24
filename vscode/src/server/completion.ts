@@ -1,18 +1,17 @@
 import { CompletionItem, CompletionItemKind, Position } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import { collectStoryInfo, BUILTIN_HELPER_NAMES } from '../../../engine/src/check.js';
+import { BUILTIN_HELPER_NAMES, type StoryInfo } from '../../../engine/src/check.js';
 import { detectCompletionContext } from '../shared/context.js';
 
 export async function completeAt(
-  root: string,
   doc: TextDocument,
   position: Position,
+  info: StoryInfo,
 ): Promise<CompletionItem[]> {
   const textBefore = doc.getText({ start: { line: 0, character: 0 }, end: position });
   const ctx = detectCompletionContext(textBefore);
   if (ctx.kind === 'none') return [];
 
-  const info = await collectStoryInfo(root);
   switch (ctx.kind) {
     case 'macro-name':
       return [...info.knownMacros].map(name => ({
