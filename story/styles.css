@@ -68,6 +68,35 @@ ul.choices li { margin: .45em 0; }
 .battle-log div { margin: .2em 0; }
 .battle-close { margin-top: 1em; padding: .4em 1.2em; }
 
+/* 读档面板（save-system.ts 的多存档位列表）。 */
+.save-overlay {
+  position: fixed; inset: 0; z-index: 110;
+  background: rgba(0, 0, 0, .6);
+  display: flex; align-items: center; justify-content: center;
+}
+.save-window {
+  width: min(30em, 90vw);
+  background: #1d1d1d; border: 1px solid #444; border-radius: 8px;
+  padding: 1.2em 1.4em; box-shadow: 0 8px 30px rgba(0, 0, 0, .5);
+}
+.save-window h3 { margin: 0 0 .8em; }
+.save-slots { list-style: none; margin: 0 0 .8em; padding: 0; max-height: 50vh; overflow-y: auto; }
+.save-slots li {
+  display: flex; align-items: center; gap: .6em;
+  padding: .5em .6em; margin: .35em 0;
+  background: rgba(255, 255, 255, .05); border-radius: 6px;
+}
+.save-slots li.save-empty { background: none; opacity: .6; }
+.save-info { flex: 1; font-size: .9em; }
+.save-slots button { flex: none; }
+.save-delete { color: #ff8a8a; }
+.save-close { margin-top: .4em; padding: .4em 1.2em; }
+button {
+  background: rgba(255, 255, 255, .12); color: inherit;
+  border: 1px solid #555; border-radius: 5px; padding: .2em .7em; cursor: pointer;
+}
+button:hover { background: rgba(255, 255, 255, .2); }
+
 @media (max-width: 767px) {
   #ui-bar {
     position: static; width: auto; height: auto;

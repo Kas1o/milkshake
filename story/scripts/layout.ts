@@ -1,6 +1,75 @@
 import type { StoryController, StoryLayout } from '../../engine/src/index.js';
+import { saveGame, loadGame, deleteSave, listSaves } from './save-system.js';
 
 let ctrl: StoryController | null = null;
+
+/** 读档面板：列出所有存档位，可读档 / 删除。DOM 只在函数内访问（Node 侧安全）。 */
+function openSavesPanel(c: StoryController) {
+  const overlay = document.createElement('div');
+  overlay.className = 'save-overlay';
+  const box = document.createElement('div');
+  box.className = 'save-window';
+
+  const title = document.createElement('h3');
+  title.textContent = '读档';
+
+  const list = document.createElement('ul');
+  list.className = 'save-slots';
+
+  function renderList() {
+    list.innerHTML = '';
+    const saves = listSaves();
+    if (!saves.length) {
+      const li = document.createElement('li');
+      li.className = 'save-empty';
+      li.textContent = '（暂无存档）';
+      list.appendChild(li);
+      return;
+    }
+    for (const s of saves) {
+      const li = document.createElement('li');
+      const info = document.createElement('span');
+      info.className = 'save-info';
+      info.textContent = `${s.label} · ${new Date(s.savedAt).toLocaleString()}`;
+
+      const loadBtn = document.createElement('button');
+      loadBtn.type = 'button';
+      loadBtn.textContent = '读档';
+      loadBtn.addEventListener('click', async () => {
+        if (!loadGame(c.engine, s.id)) return;
+        overlay.remove();
+        await layout.render(c, await c.engine.renderCurrent());
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'save-delete';
+      delBtn.textContent = '删除';
+      delBtn.addEventListener('click', () => {
+        deleteSave(s.id);
+        renderList();
+      });
+
+      li.append(info, loadBtn, delBtn);
+      list.appendChild(li);
+    }
+  }
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'save-close';
+  closeBtn.textContent = '关闭';
+  closeBtn.addEventListener('click', () => overlay.remove());
+
+  overlay.addEventListener('click', ev => {
+    if (ev.target === overlay) overlay.remove();
+  });
+
+  box.append(title, list, closeBtn);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  renderList();
+}
 
 /**
  * 默认页面布局：SugarCube 风格左侧边栏 + 底部链接列表。
@@ -18,7 +87,11 @@ export const layout: StoryLayout = {
             <div id="story-caption"></div>
           </div>
           <nav id="menu">
-            <ul><li><a href="#" id="menu-restart">重新开始</a></li></ul>
+            <ul>
+              <li><a href="#" id="menu-restart">重新开始</a></li>
+              <li><a href="#" id="menu-save">存档</a></li>
+              <li><a href="#" id="menu-load">读档</a></li>
+            </ul>
           </nav>
         </div>
         <main id="story"><div id="passages"></div></main>
@@ -27,6 +100,23 @@ export const layout: StoryLayout = {
     document.getElementById('menu-restart')!.addEventListener('click', ev => {
       ev.preventDefault();
       c.restart();
+    });
+
+    // 存档：新建一个存档位（自由数量），写入 localStorage。
+    document.getElementById('menu-save')!.addEventListener('click', ev => {
+      ev.preventDefault();
+      const d = saveGame(c.engine);
+      alert(`已新建存档：${d.label}（${new Date(d.savedAt).toLocaleTimeString()}）。当前共 ${listSaves().length} 个存档位。`);
+    });
+
+    // 读档：打开面板，从任意存档位恢复并重绘当前段落。
+    document.getElementById('menu-load')!.addEventListener('click', ev => {
+      ev.preventDefault();
+      if (!listSaves().length) {
+        alert('还没有任何存档，先点「存档」创建一个吧。');
+        return;
+      }
+      openSavesPanel(c);
     });
   },
 

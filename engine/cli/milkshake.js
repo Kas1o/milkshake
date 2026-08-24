@@ -15,7 +15,8 @@ if (!sub || !entries[sub]) {
   console.error('  milkshake check [故事目录]               静态检查');
   console.error('  milkshake build [故事目录] [-o 目录]     导出 Web');
   console.error('  milkshake dev [故事目录] [-o 目录] [-p 端口]  构建并本地监听');
-  console.error('  milkshake new <目标目录>                 初始化新故事项目');
+  console.error('  milkshake new <目标目录> [--name 标题] [--with a,b] [--interactive]');
+  console.error('                           初始化新故事项目（向导可勾选基础设施）');
   process.exit(1);
 }
 

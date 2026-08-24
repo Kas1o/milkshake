@@ -4,7 +4,9 @@ import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { initProject } from '../src/web/init.js';
+import { loadInfraModules, resolveModules, applyModules } from '../src/web/infra.js';
 import { isSpecialScript, isStoryRoot, resolveStoryDir } from '../src/engine/story.js';
+import { checkStory } from '../src/check.js';
 
 test('initProject copies the default project template', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'milkshake-new-'));
@@ -32,6 +34,85 @@ test('initProject refuses a non-empty target directory', async () => {
   try {
     await writeFile(join(dir, 'existing.txt'), 'x');
     await assert.rejects(() => initProject(dir), /不为空/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('loadInfraModules discovers the save module', async () => {
+  const mods = await loadInfraModules();
+  const save = mods.find(m => m.id === 'save');
+  assert.ok(save, '应发现 save 模块');
+  assert.ok(save.files!.includes('scripts/save-system.ts'));
+  assert.ok(save.patches!.length >= 3);
+});
+
+test('resolveModules: unknown id throws; deps dedupe', async () => {
+  await assert.rejects(() => resolveModules(['nope']), /未知的基础设施模块/);
+  const [m] = await resolveModules(['save']);
+  assert.equal(m.id, 'save');
+});
+
+test('initProject with --with save wires the module into the project', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'milkshake-new-'));
+  try {
+    await initProject({ dir, title: '测试故事', with: ['save'] });
+
+    // 拷贝的脚本存在。
+    const sys = await readFile(join(dir, 'scripts', 'save-system.ts'), 'utf8');
+    assert.match(sys, /export function saveGame/);
+    const ui = await readFile(join(dir, 'scripts', 'save-ui.ts'), 'utf8');
+    assert.match(ui, /export function initSaveUI/);
+
+    // layout.ts 被接线：import + 菜单按钮 + initSaveUI 调用。
+    const layout = await readFile(join(dir, 'scripts', 'layout.ts'), 'utf8');
+    assert.match(layout, /import \{ initSaveUI \} from '\.\/save-ui\.js'/);
+    assert.match(layout, /id="menu-save"/);
+    assert.match(layout, /id="menu-load"/);
+    assert.match(layout, /initSaveUI\(ctrl/);
+
+    // styles.css 追加面板样式。
+    const css = await readFile(join(dir, 'styles.css'), 'utf8');
+    assert.match(css, /\.save-window/);
+
+    // 标题被替换。
+    assert.match(await readFile(join(dir, 'story.config.ts'), 'utf8'), /name: "测试故事"/);
+    assert.match(await readFile(join(dir, 'passages', '00_ui.mksk'), 'utf8'), /测试故事/);
+
+    // 生成的项目能通过静态检查。
+    const issues = await checkStory(dir);
+    assert.deepEqual(issues, [], `生成的带存档项目应有 0 个检查问题，实际：${JSON.stringify(issues)}`);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('initProject without infra leaves the template untouched', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'milkshake-new-'));
+  try {
+    await initProject({ dir, title: '朴素故事' });
+    const layout = await readFile(join(dir, 'scripts', 'layout.ts'), 'utf8');
+    assert.doesNotMatch(layout, /menu-save/);
+    assert.ok(!(await readdir(join(dir, 'scripts'))).some(f => f === 'save-system.ts'));
+    const issues = await checkStory(dir);
+    assert.deepEqual(issues, []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('applyModules reports a missing anchor instead of silently skipping', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'milkshake-new-'));
+  try {
+    await initProject({ dir, title: '锚点测试' });
+    const mods = await resolveModules(['save']);
+    const broken = mods.map(m => ({
+      ...m,
+      patches: [{ file: 'scripts/layout.ts', anchor: 'THIS-ANCHOR-DOES-NOT-EXIST', insert: 'x' }],
+    }));
+    const errors = await applyModules(dir, broken);
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /anchor 未命中/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

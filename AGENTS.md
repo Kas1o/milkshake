@@ -20,7 +20,8 @@ Milkshake：一个 Twine / SugarCube 风格的互动小说（Interactive Fiction
 # engine
 npm run check       # 静态检查 story/（走 src/check.ts）
 npm run build       # check + 导出 Web 到 web-dist/（src/web/build.ts，esbuild 打包）
-npm run new -- <dir> # 从内置模板（engine/template/）初始化新故事项目（src/web/init.ts）
+npm run new -- <dir> # 初始化新故事项目（src/web/init.ts，向导可选装基础设施）
+#   milkshake new <dir> [--name 标题] [--with save,battle] [--interactive]
 npm run typecheck   # tsc --noEmit
 npm test            # node --import tsx --test "test/*.test.ts"
 
@@ -33,6 +34,21 @@ npm test            # 含 LSP e2e 测试，需先 npm run build
 
 技术栈：TypeScript（strict）、ESM（`"type": "module"`）、esbuild、`tsx`、Node 内置 test runner（`node:test`）。
 无 jest/mocha/vitest。改动后请运行相关目录的 `npm run typecheck` 与 `npm test`。
+
+> 运行时依赖约束：CLI/向导用 `@inquirer/prompts`（仅 Node 端 init 使用，不会打进 Web 产物）。
+
+## 基础设施模块（`engine/infra/`）
+
+`milkshake new` 的向导按需装配「基础设施模块」到新项目。每个模块是 `engine/infra/<id>/` 下的自治包：
+
+- `module.ts`：导出 `default InfraModule`（见 `engine/src/web/infra.ts` 的 `InfraModule`），含 `id / label / description`、
+  `files`（随模块拷入项目的脚本相对路径）与 `patches`（对生成文件做字符串补丁：`file + anchor + insert`，`mode` 为
+  `after`/`before`/`append`）。
+- 模块脚本必须**自包含**（用结构类型，勿 `import` 引擎），因为独立新项目里没有 `../../engine`；check/build 运行时剥离类型。
+
+`init.ts` 流程：复制 base 模板 → 替换标题（story.config.ts / 00_ui.mksk）→ 依次 `resolveModules`（依赖展开、去重、按依赖排序）→
+`applyModules`（拷文件 + 打补丁，anchor 未命中会报错而非静默漏装）。交互模式用 `@inquirer/prompts` 询问标题与多选模块；
+非交互用 `--name` / `--with a,b`。首个样板模块：`save`（存档/读档，见 `engine/infra/save/`）。
 
 ## .mksk 剧本格式
 
