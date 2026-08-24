@@ -7,7 +7,7 @@ import ts from 'typescript';
 import { Engine, makeContext } from './engine/engine.js';
 import { coreMacros } from './engine/macros.js';
 import { parseNodes, splitArgs } from './engine/parser.js';
-import { walk, parsePassageFile, loadVars, isSpecialScript, importTsFile } from './engine/story.js';
+import { walk, parsePassageFile, loadVars, isSpecialScript, importTsFile, resolveStoryDir } from './engine/story.js';
 import type { Node, PassageSource } from './types.js';
 
 export interface CheckIssue {
@@ -113,8 +113,7 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
     if (n.name === 'button' || n.name === 'script') {
       // Raw content becomes link setup / inline code at runtime.
       const code = (n.content ?? []).map(x => (x.kind === 'text' ? x.text : '')).join('');
-      if (n.name === 'button') addExpr(passage, 'stmt', code, locals);
-      else addExpr(passage, 'stmt', code, locals);
+      addExpr(passage, 'stmt', code, locals);
       return;
     }
     if (knownMacros.has(n.name)) {
@@ -463,15 +462,9 @@ function indent(code: string): string {
 // CLI entry: tsx src/check.ts [故事目录]
 // ---------------------------------------------------------------------------
 
-function defaultStoryDir(): string {
-  if (existsSync(resolve(process.cwd(), 'story'))) return 'story';
-  if (existsSync(resolve(process.cwd(), '../story'))) return '../story';
-  return 'story';
-}
-
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 if (isMain) {
-  const dir = resolve(process.cwd(), process.argv[2] ?? defaultStoryDir());
+  const dir = resolveStoryDir(process.cwd(), process.argv[2]);
   checkStory(dir)
     .then(issues => {
       if (!issues.length) {

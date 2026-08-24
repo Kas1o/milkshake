@@ -17,8 +17,8 @@ export async function initProject(dirArg?: string): Promise<void> {
   console.log('包含默认布局（scripts/layout.ts + index.html + styles.css），可直接修改。');
   console.log('接下来：');
   console.log(`  cd ${dir}`);
-  console.log('  npm run check   # 静态检查');
-  console.log('  npm run build   # 导出 Web 到 web-dist/');
+  console.log('  milkshake check   # 静态检查');
+  console.log('  milkshake build   # 导出 Web 到 web-dist/');
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;

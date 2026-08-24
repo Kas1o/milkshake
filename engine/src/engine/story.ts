@@ -170,3 +170,31 @@ export function isSpecialScript(p: string): boolean {
     p.endsWith('layout.ts')
   );
 }
+
+/** Whether `dir` looks like a story root: has a `passages/` dir, a
+ * `story.config.ts`, or a `vars.ts`. These are exactly the files `npm run new`
+ * drops into a standalone project (flat, no `story/` subdir). */
+export function isStoryRoot(dir: string): boolean {
+  return (
+    existsSync(join(dir, 'passages')) ||
+    existsSync(join(dir, 'story.config.ts')) ||
+    existsSync(join(dir, 'vars.ts'))
+  );
+}
+
+/**
+ * Resolve a story root from a CLI directory argument.
+ *   - an explicit `dirArg` always wins;
+ *   - otherwise, if `cwd` is itself a story root (flat standalone project,
+ *     e.g. created by `npm run new`), use `cwd`;
+ *   - else prefer a `story/` subdir, then `../story` (the engine-repo layout
+ *     where `check`/`build` run from `engine/`);
+ *   - otherwise throw so the caller never silently scans an empty dir.
+ */
+export function resolveStoryDir(cwd: string, dirArg?: string): string {
+  if (dirArg) return resolve(cwd, dirArg);
+  if (isStoryRoot(cwd)) return cwd;
+  if (isStoryRoot(join(cwd, 'story'))) return join(cwd, 'story');
+  if (isStoryRoot(join(cwd, '..', 'story'))) return resolve(cwd, '..', 'story');
+  throw new Error(`找不到故事目录：${cwd}（需要 passages/、story.config.ts 或 vars.ts）`);
+}

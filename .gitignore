@@ -2,3 +2,6 @@ node_modules/
 dist/
 web-dist/
 *.log
+
+**/bin
+*.vsix

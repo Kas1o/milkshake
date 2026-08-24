@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "A Twine/SugarCube-like interactive fiction engine with TypeScript expressions and file-separated projects.",
+  "bin": {
+    "milkshake": "bin/milkshake.js"
+  },
   "scripts": {
     "check": "tsx src/check.ts ../story",
     "build": "npm run check && tsx src/web/build.ts ../story -o ../web-dist",

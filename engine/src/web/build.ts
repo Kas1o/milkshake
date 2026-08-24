@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
-import { walk, parsePassageFile, loadConfig, isSpecialScript, importTsFile } from '../engine/story.js';
+import { walk, parsePassageFile, loadConfig, isSpecialScript, importTsFile, resolveStoryDir } from '../engine/story.js';
 import type { PassageSource } from '../types.js';
 
 const DEFAULT_TEMPLATE = `<!doctype html>
@@ -51,9 +51,9 @@ async function exportsInstall(f: string): Promise<boolean> {
 }
 
 export async function exportWeb(dirArg?: string, outArg?: string): Promise<void> {
-  const storyRoot = (existsSync(resolve(process.cwd(), dirArg ?? 'story')) || dirArg) ? '' : '..';
-  const dir = resolve(process.cwd(), storyRoot, dirArg ?? 'story');
-  const out = resolve(process.cwd(), outArg ?? join(storyRoot, 'web-dist'));
+  const cwd = process.cwd();
+  const dir = resolveStoryDir(cwd, dirArg);
+  const out = resolve(cwd, outArg ?? join(dir, 'web-dist'));
 
   const passageFiles = await walk(dir, p => /\.mksk$/i.test(p));
   const scriptFiles: string[] = [];

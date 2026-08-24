@@ -3,6 +3,7 @@ import { Location, Position, Range } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { collectStoryInfo } from '../../../engine/src/check.js';
 import { findPassageRefAt } from '../shared/context.js';
+import { lineLength } from '../shared/locate.js';
 
 export async function definitionAt(
   root: string,
@@ -18,8 +19,9 @@ export async function definitionAt(
   const info = await collectStoryInfo(root);
   const loc = info.locations.get(ref.target);
   if (!loc) return null;
+  const end = await lineLength(loc.file, loc.line);
   return Location.create(
     pathToFileURL(loc.file).href,
-    Range.create(loc.line, 0, loc.line, 1000),
+    Range.create(loc.line, 0, loc.line, Math.max(end, 1)),
   );
 }
