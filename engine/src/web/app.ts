@@ -1,6 +1,6 @@
 import { Engine, makeContext } from '../engine/engine.js';
 import type { RenderResult, Vars } from '../types.js';
-import { mdToHtml } from './md.js';
+import { mdToHtml, inlineLinksToHtml } from './md.js';
 
 /** Navigation / rendering helpers handed to a layout. */
 export interface StoryController {
@@ -13,6 +13,10 @@ export interface StoryController {
   restart(): Promise<void>;
   /** Follow a rendered link / button and paint the result. */
   choose(id: string): Promise<void>;
+  /** Render inline link placeholders into clickable anchors (call on the body HTML). */
+  inlineLinks(html: string, result: RenderResult): string;
+  /** Wire click handlers to anchors produced by inlineLinks. */
+  bindLinks(root: ParentNode, result: RenderResult): void;
 }
 
 /**
@@ -40,11 +44,12 @@ const defaultLayout: StoryLayout = {
   init() {
     document.body.innerHTML = '<main id="story"><div id="passages"></div></main>';
   },
-  render(_ctrl, result) {
+  render(ctrl, result) {
     const el = document.getElementById('passages')!;
     const div = document.createElement('div');
     div.className = 'passage';
-    div.innerHTML = mdToHtml(result.text);
+    div.innerHTML = ctrl.inlineLinks(mdToHtml(result.text), result);
+    ctrl.bindLinks(div, result);
     el.appendChild(div);
     window.scrollTo({ top: 0 });
   },
@@ -96,6 +101,17 @@ export async function runStory(bundle: StoryBundle): Promise<void> {
     engine,
     md: mdToHtml,
     advance,
+    inlineLinks: (html, result) =>
+      inlineLinksToHtml(html, id => result.links.find(l => l.id === id)),
+    bindLinks: (root, result) => {
+      root.querySelectorAll('a.link[data-link]').forEach(a => {
+        a.addEventListener('click', ev => {
+          ev.preventDefault();
+          const id = a.getAttribute('data-link');
+          if (id) ctrl.choose(id);
+        });
+      });
+    },
     restart: guard(async () => {
       engine.reset();
       current = await engine.start();

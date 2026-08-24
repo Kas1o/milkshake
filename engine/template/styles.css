@@ -38,8 +38,8 @@ blockquote { border-left: 3px solid #555; margin: .75em 0; padding-left: .9em; o
 code { background: rgba(255,255,255,.1); border-radius: 4px; padding: 0 .3em; }
 hr { border: 0; border-top: 1px dashed #555; margin: 1.5em 0; }
 
-ul.choices { list-style: none; margin: 1.5em 0 0; padding: 0; }
-ul.choices li { margin: .45em 0; }
+a.link { color: #7fd0ff; text-decoration: underline; cursor: pointer; }
+a.link:hover { color: #aee4ff; }
 
 @media (max-width: 767px) {
   #ui-bar {

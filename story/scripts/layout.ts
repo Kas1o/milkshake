@@ -151,26 +151,9 @@ export const layout: StoryLayout = {
 
     const body = document.createElement('div');
     body.className = 'passage-body';
-    body.innerHTML = c.md(result.text);
+    body.innerHTML = c.inlineLinks(c.md(result.text), result);
+    c.bindLinks(body, result);
     el.appendChild(body);
-
-    if (result.links.length) {
-      const ul = document.createElement('ul');
-      ul.className = 'choices';
-      for (const link of result.links) {
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = '#';
-        a.textContent = link.label;
-        a.addEventListener('click', ev => {
-          ev.preventDefault();
-          c.choose(link.id);
-        });
-        li.appendChild(a);
-        ul.appendChild(li);
-      }
-      el.appendChild(ul);
-    }
 
     passagesEl.appendChild(el);
     window.scrollTo({ top: 0 });

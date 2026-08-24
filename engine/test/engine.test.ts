@@ -116,9 +116,9 @@ test('button re-renders current passage', async () => {
   const e = createEngine();
   e.loadPassages([P('<<if !has(\'n\')>><<set n = 0>><</if>>n=${n}<<button "+">>n += 1<</button>>')]);
   const r1 = await e.start();
-  assert.equal(r1.text, 'n=0');
+  assert.equal(r1.text.replace(/[\uE000](L\d+)[\uE001]/g, ''), 'n=0');
   const r2 = (await e.choose(r1.links[0].id))!;
-  assert.equal(r2.text.includes('n=1'), true);
+  assert.equal(r2.text.replace(/[\uE000](L\d+)[\uE001]/g, '').includes('n=1'), true);
 });
 
 test('button setup captures loop scope', async () => {

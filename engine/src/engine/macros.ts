@@ -13,7 +13,7 @@ export interface MacroContext {
   evalStr(expr: string): string;
   runScript(code: string): void;
   render(nodes: Node[]): Promise<string>;
-  emitLink(link: { kind: 'link' | 'button'; label: string; target?: string; setup?: string }): void;
+  emitLink(link: { kind: 'link' | 'button'; label: string; target?: string; setup?: string }): string;
   navigate(target: string): void;
   stop(): void;
   declareLocal(name: string, value: unknown): void;
@@ -198,8 +198,7 @@ export const coreMacros: MacroDef[] = [
       const label = ctx.evalStr(ctx.args);
       const target = (await ctx.render(ctx.content ?? [])).trim();
       if (!target) throw new Error('<<link>> produced an empty target');
-      ctx.emitLink({ kind: 'link', label, target });
-      return '';
+      return ctx.emitLink({ kind: 'link', label, target });
     },
   },
   {
@@ -208,8 +207,7 @@ export const coreMacros: MacroDef[] = [
     raw: true,
     run: ctx => {
       const label = ctx.evalStr(ctx.args);
-      ctx.emitLink({ kind: 'button', label, setup: rawText(ctx.content) });
-      return '';
+      return ctx.emitLink({ kind: 'button', label, setup: rawText(ctx.content) });
     },
   },
   { name: 'widget', block: true, run: () => '' },

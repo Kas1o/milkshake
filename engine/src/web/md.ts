@@ -6,6 +6,18 @@ export function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/** Replace inline link placeholders (LINK_SENTINEL_RE) with real anchors. */
+export function inlineLinksToHtml(
+  html: string,
+  linkById: (id: string) => { label: string } | undefined,
+): string {
+  return html.replace(/[\uE000](L\d+)[\uE001]/g, (m, id: string) => {
+    const link = linkById(id);
+    const label = link ? link.label : id;
+    return `<a href="#" class="link" data-link="${id}">${escapeHtml(label)}</a>`;
+  });
+}
+
 export function mdToHtml(md: string): string {
   const lines = md.split('\n');
   const out: string[] = [];

@@ -34,6 +34,15 @@ export function makeContext<T extends object = Vars>(engine: Engine<T>): StoryCo
   };
 }
 
+/** Inline link placeholder markers, replaced with anchors by the layout. */
+export const LINK_OPEN = '\uE000';
+export const LINK_END = '\uE001';
+/** Matches an inline link placeholder: LINK_OPEN + id + LINK_END. */
+export const LINK_SENTINEL_RE = /[\uE000](L\d+)[\uE001]/g;
+export function linkSentinel(id: string): string {
+  return `${LINK_OPEN}${id}${LINK_END}`;
+}
+
 interface RendCollector {
   links: Link[];
   stopped: boolean;
@@ -238,16 +247,19 @@ export class Engine<T extends object = Vars> {
         case 'interp':
           out += this.stringify(this.evalExpr(node.expr, scope));
           break;
-        case 'link':
+        case 'link': {
+          const id = 'L' + rc.links.length;
           rc.links.push({
-            id: 'L' + rc.links.length,
+            id,
             kind: 'link',
             label: node.label,
             target: node.target,
             setup: node.setup,
             captured: this.captureScope(),
           });
+          out += linkSentinel(id);
           break;
+        }
         case 'macro': {
           const def = this.macros.get(node.name);
           if (!def) {
@@ -293,7 +305,9 @@ export class Engine<T extends object = Vars> {
       },
       render: (ns: Node[]) => engine.renderNodes(ns, scope, passage, rc),
       emitLink: l => {
-        rc.links.push({ id: 'L' + rc.links.length, ...l, captured: engine.captureScope() });
+        const id = 'L' + rc.links.length;
+        rc.links.push({ id, ...l, captured: engine.captureScope() });
+        return linkSentinel(id);
       },
       navigate: (t: string) => {
         engine.pendingNav = t;
