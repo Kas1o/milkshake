@@ -1,0 +1,95 @@
+import { Engine, makeContext } from '../engine/engine.js';
+import type { RenderResult, Vars } from '../types.js';
+import { mdToHtml } from './md.js';
+
+/** Navigation / rendering helpers handed to a layout. */
+export interface StoryController {
+  engine: Engine;
+  /** Convert story text (lightweight Markdown) to HTML. */
+  md(md: string): string;
+  /** Consume pending navigations and paint the current passage. */
+  advance(): Promise<void>;
+  /** Reset and restart the story, then paint the start passage. */
+  restart(): Promise<void>;
+  /** Follow a rendered link / button and paint the result. */
+  choose(id: string): Promise<void>;
+}
+
+/**
+ * A pluggable page layout. Story projects provide their own via `layout.ts`
+ * (see the project template); `runStory` falls back to a minimal built-in.
+ */
+export interface StoryLayout {
+  /** Called once to build the page skeleton and wire controls. */
+  init(ctrl: StoryController): void;
+  /** Called after every render to paint a passage into the DOM. */
+  render(ctrl: StoryController, result: RenderResult): Promise<void> | void;
+}
+
+export interface StoryBundle {
+  title?: string;
+  start?: string;
+  vars?: Vars;
+  passages: import('../types.js').PassageSource[];
+  install: (ctx: ReturnType<typeof makeContext>) => Promise<void>;
+  layout?: StoryLayout;
+}
+
+const defaultLayout: StoryLayout = {
+  init() {
+    document.body.innerHTML = '<main id="story"><div id="passages"></div></main>';
+  },
+  render(_ctrl, result) {
+    const el = document.getElementById('passages')!;
+    const div = document.createElement('div');
+    div.className = 'passage';
+    div.innerHTML = mdToHtml(result.text);
+    el.appendChild(div);
+    window.scrollTo({ top: 0 });
+  },
+};
+
+export async function runStory(bundle: StoryBundle): Promise<void> {
+  const engine = new Engine({
+    name: bundle.title ?? 'Milkshake Story',
+    start: bundle.start ?? 'Start',
+    vars: bundle.vars,
+  });
+  engine.ask = async prompt => window.prompt(prompt) ?? '';
+  const ctx = makeContext(engine);
+  await bundle.install(ctx);
+  engine.loadPassages(bundle.passages);
+
+  const layout = bundle.layout ?? defaultLayout;
+  let current: RenderResult | null = null;
+  let ctrl: StoryController;
+
+  const advance = async () => {
+    let guard = 0;
+    while (engine.pendingNav) {
+      if (++guard > 200) break;
+      current = (await engine.consumePendingNav())!;
+    }
+    if (!current) current = await engine.renderCurrent();
+    await layout.render(ctrl, current);
+  };
+
+  ctrl = {
+    engine,
+    md: mdToHtml,
+    advance,
+    restart: async () => {
+      engine.reset();
+      current = await engine.start();
+      await advance();
+    },
+    choose: async id => {
+      current = (await engine.choose(id)) ?? current;
+      await advance();
+    },
+  };
+
+  layout.init(ctrl);
+  current = await engine.start();
+  await advance();
+}

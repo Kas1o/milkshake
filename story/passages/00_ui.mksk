@@ -1,0 +1,9 @@
+:: StoryTitle
+奶昔传说
+
+:: StoryCaption
+**${name || '无名旅人'}**
+
+- 金币：${gold}
+- 体力：${hp}/${maxhp}
+- 第 ${day} 天

@@ -1,0 +1,56 @@
+export function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+export function mdToHtml(md: string): string {
+  const lines = md.split('\n');
+  const out: string[] = [];
+  let inList = false;
+  const closeList = () => {
+    if (inList) {
+      out.push('</ul>');
+      inList = false;
+    }
+  };
+  for (const raw of lines) {
+    let l = escapeHtml(raw);
+    l = l.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    l = l.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    l = l.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    const h = l.match(/^(#{1,6})\s+(.+)$/);
+    if (h) {
+      closeList();
+      const level = h[1].length;
+      out.push(`<h${level}>${h[2]}</h${level}>`);
+      continue;
+    }
+    if (/^>\s?/.test(l)) {
+      closeList();
+      out.push(`<blockquote>${l.replace(/^>\s?/, '')}</blockquote>`);
+      continue;
+    }
+    const li = l.match(/^\s*[-*]\s+(.+)$/);
+    if (li) {
+      if (!inList) {
+        out.push('<ul>');
+        inList = true;
+      }
+      out.push(`<li>${li[1]}</li>`);
+      continue;
+    }
+    if (/^\s*---+\s*$/.test(l)) {
+      closeList();
+      out.push('<hr>');
+      continue;
+    }
+    closeList();
+    if (l.trim()) out.push(`<p>${l}</p>`);
+  }
+  closeList();
+  return out.join('\n');
+}

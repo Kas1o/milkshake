@@ -1,0 +1,51 @@
+/* 默认主题（SugarCube 风格）。新增项目后随模板复制到 styles.css，可自由修改。 */
+:root { color-scheme: dark; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  background-color: #111; color: #eee;
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+}
+a:link { color: #7ea4ff; text-decoration: none; }
+a:visited { color: #7ea4ff; }
+a:hover, a:active { color: #9fbfff; text-decoration: underline; }
+
+#ui-bar {
+  position: fixed; top: 0; bottom: 0; left: 0;
+  width: 17em; padding: 1.2em 1.4em;
+  background-color: #1d1d1d; border-right: 1px solid #444;
+  overflow-y: auto;
+}
+#story-title {
+  font-size: 1.25em; font-weight: bold; margin: 0 0 .4em;
+  padding-bottom: .35em; border-bottom: 1px solid #444;
+}
+#story-caption { font-size: .85em; opacity: .85; }
+#story-caption p { margin: .3em 0; }
+#menu { margin-top: 1.5em; font-size: .9em; }
+#menu ul { list-style: none; margin: 0; padding: 0; }
+#menu li { margin: .25em 0; }
+
+#story { margin-left: 17em; }
+#passages { position: relative; max-width: 46em; margin: 0 auto; padding: 2.5em 2em 6em; }
+.passage { transition: opacity .4s ease; }
+.passage-in { animation: passage-fade-in .4s ease; }
+.passage-out { position: absolute; top: 2.5em; left: 2em; right: 2em; opacity: 0; pointer-events: none; }
+@keyframes passage-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.passage-body p { margin: .75em 0; }
+.passage-body h1, .passage-body h2, .passage-body h3 { line-height: 1.3; }
+blockquote { border-left: 3px solid #555; margin: .75em 0; padding-left: .9em; opacity: .8; }
+code { background: rgba(255,255,255,.1); border-radius: 4px; padding: 0 .3em; }
+hr { border: 0; border-top: 1px dashed #555; margin: 1.5em 0; }
+
+ul.choices { list-style: none; margin: 1.5em 0 0; padding: 0; }
+ul.choices li { margin: .45em 0; }
+
+@media (max-width: 767px) {
+  #ui-bar {
+    position: static; width: auto; height: auto;
+    border-right: 0; border-bottom: 1px solid #444; padding: 1em 1.25em;
+  }
+  #story { margin-left: 0; }
+  .passage-out { position: absolute; top: 2.5em; left: 2em; right: 2em; }
+}

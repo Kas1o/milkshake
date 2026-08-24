@@ -1,0 +1,156 @@
+{
+  "scopeName": "source.milkshake",
+  "name": "Milkshake",
+  "fileTypes": ["mksk"],
+  "patterns": [
+    { "include": "#passage-header" },
+    { "include": "#comment" },
+    { "include": "#macro" },
+    { "include": "#link" },
+    { "include": "#interp" },
+    { "include": "#markdown" }
+  ],
+  "repository": {
+    "passage-header": {
+      "match": "^(::)\\s*(.+?)\\s*(\\{[^}]*\\}|\\[[^\\]]*\\])?\\s*$",
+      "captures": {
+        "1": { "name": "punctuation.definition.heading.milkshake" },
+        "2": { "name": "entity.name.section.milkshake" },
+        "3": { "name": "entity.other.attribute-name.tag.milkshake" }
+      }
+    },
+    "comment": {
+      "name": "comment.block.html.milkshake",
+      "begin": "<!--",
+      "end": "-->"
+    },
+    "macro": {
+      "name": "meta.macro.milkshake",
+      "begin": "(<<)\\s*(/)?\\s*([A-Za-z_][\\w-]*)?",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.macro.begin.milkshake" },
+        "2": { "name": "punctuation.definition.macro.close.milkshake" },
+        "3": { "name": "entity.name.function.milkshake" }
+      },
+      "end": ">>",
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.macro.end.milkshake" }
+      },
+      "contentName": "meta.embedded.expression.milkshake",
+      "patterns": [
+        { "include": "#expression" }
+      ]
+    },
+    "link": {
+      "name": "meta.link.milkshake",
+      "begin": "\\[\\[",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.link.begin.milkshake" }
+      },
+      "end": "\\]\\]",
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.link.end.milkshake" }
+      },
+      "patterns": [
+        {
+          "match": "->",
+          "name": "punctuation.separator.link.milkshake"
+        },
+        {
+          "begin": "\\[",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.setup.begin.milkshake" }
+          },
+          "end": "\\]",
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.setup.end.milkshake" }
+          },
+          "contentName": "meta.embedded.expression.milkshake",
+          "patterns": [
+            { "include": "#expression" }
+          ]
+        },
+        {
+          "match": "[^\\[\\]>]+",
+          "name": "entity.name.tag.passage.milkshake"
+        }
+      ]
+    },
+    "interp": {
+      "name": "meta.interpolation.milkshake",
+      "begin": "\\$\\{",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.interpolation.begin.milkshake" }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.interpolation.end.milkshake" }
+      },
+      "contentName": "meta.embedded.expression.milkshake",
+      "patterns": [
+        { "include": "#expression" }
+      ]
+    },
+    "markdown": {
+      "patterns": [
+        {
+          "match": "\\*\\*[^*]+\\*\\*",
+          "name": "markup.bold.milkshake"
+        },
+        {
+          "match": "(?<!\\*)\\*(?!\\*)[^*]+\\*(?!\\*)",
+          "name": "markup.italic.milkshake"
+        }
+      ]
+    },
+    "expression": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.milkshake",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            { "match": "\\\\.", "name": "constant.character.escape.milkshake" }
+          ]
+        },
+        {
+          "name": "string.quoted.single.milkshake",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            { "match": "\\\\.", "name": "constant.character.escape.milkshake" }
+          ]
+        },
+        {
+          "name": "string.template.milkshake",
+          "begin": "`",
+          "end": "`",
+          "patterns": [
+            { "match": "\\\\.", "name": "constant.character.escape.milkshake" },
+            { "include": "#interp" }
+          ]
+        },
+        {
+          "match": "\\b\\d+(\\.\\d+)?\\b",
+          "name": "constant.numeric.milkshake"
+        },
+        {
+          "match": "\\b(if|else|for|of|in|return|true|false|null|undefined|new|typeof|let|const|var|function)\\b",
+          "name": "keyword.control.milkshake"
+        },
+        {
+          "match": "\\b[A-Za-z_$][\\w$]*(?=\\s*\\()",
+          "name": "entity.name.function.call.milkshake"
+        },
+        {
+          "match": "\\b[A-Za-z_$][\\w$]*\\b",
+          "name": "variable.other.milkshake"
+        },
+        {
+          "match": "[+\\-*/%=<>!&|]+",
+          "name": "keyword.operator.milkshake"
+        }
+      ]
+    }
+  }
+}

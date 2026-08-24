@@ -1,0 +1,15 @@
+:: Start {start}
+# 欢迎
+
+这里是你的新故事。编辑 `passages/*.mksk` 与 `scripts/*.ts` 开始创作吧。
+
+<<set name = '冒险者'>>
+
+[[继续->Next]]
+
+:: Next
+旅途开始了。
+
+现在是第 ${day} 天，你带着 ${gold} 枚金币。
+
+<<button "睡一觉">>day += 1<</button>>

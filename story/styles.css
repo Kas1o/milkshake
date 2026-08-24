@@ -1,0 +1,78 @@
+/* 默认主题（SugarCube 风格）。新增项目后随模板复制到 styles.css，可自由修改。 */
+:root { color-scheme: dark; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  background-color: #111; color: #eee;
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+}
+a:link { color: #7ea4ff; text-decoration: none; }
+a:visited { color: #7ea4ff; }
+a:hover, a:active { color: #9fbfff; text-decoration: underline; }
+
+#ui-bar {
+  position: fixed; top: 0; bottom: 0; left: 0;
+  width: 17em; padding: 1.2em 1.4em;
+  background-color: #1d1d1d; border-right: 1px solid #444;
+  overflow-y: auto;
+}
+#story-title {
+  font-size: 1.25em; font-weight: bold; margin: 0 0 .4em;
+  padding-bottom: .35em; border-bottom: 1px solid #444;
+}
+#story-caption { font-size: .85em; opacity: .85; }
+#story-caption p { margin: .3em 0; }
+#menu { margin-top: 1.5em; font-size: .9em; }
+#menu ul { list-style: none; margin: 0; padding: 0; }
+#menu li { margin: .25em 0; }
+
+#story { margin-left: 17em; }
+#passages { position: relative; max-width: 46em; margin: 0 auto; padding: 2.5em 2em 6em; }
+.passage { transition: opacity .4s ease; }
+.passage-in { animation: passage-fade-in .4s ease; }
+.passage-out { position: absolute; top: 2.5em; left: 2em; right: 2em; opacity: 0; pointer-events: none; }
+@keyframes passage-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.passage-body p { margin: .75em 0; }
+.passage-body h1, .passage-body h2, .passage-body h3 { line-height: 1.3; }
+blockquote { border-left: 3px solid #555; margin: .75em 0; padding-left: .9em; opacity: .8; }
+code { background: rgba(255,255,255,.1); border-radius: 4px; padding: 0 .3em; }
+hr { border: 0; border-top: 1px dashed #555; margin: 1.5em 0; }
+
+ul.choices { list-style: none; margin: 1.5em 0 0; padding: 0; }
+ul.choices li { margin: .45em 0; }
+
+/* <<battle>> 阻塞式旁路弹窗（custom-macros.ts 的 openBattleModal 创建）。 */
+.battle-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0, 0, 0, .6);
+  display: flex; align-items: center; justify-content: center;
+}
+.battle-window {
+  width: min(26em, 90vw);
+  background: #1d1d1d; border: 1px solid #444; border-radius: 8px;
+  padding: 1.2em 1.4em; box-shadow: 0 8px 30px rgba(0, 0, 0, .5);
+}
+.battle-enemy { font-size: 1.1em; font-weight: bold; margin-bottom: .8em; }
+.battle-bar {
+  position: relative; height: 1.2em; margin: .3em 0 .8em;
+  background: rgba(255, 255, 255, .08); border-radius: 4px; overflow: hidden;
+}
+.battle-bar-label { position: absolute; left: .5em; top: 0; font-size: .8em; line-height: 1.2em; z-index: 1; }
+.battle-bar-fill {
+  height: 100%; width: 0; background: #4caf50; transition: width .3s ease;
+}
+.battle-log {
+  height: 9em; overflow-y: auto; font-size: .9em;
+  background: rgba(0, 0, 0, .3); border-radius: 4px; padding: .5em .7em;
+}
+.battle-log div { margin: .2em 0; }
+.battle-close { margin-top: 1em; padding: .4em 1.2em; }
+
+@media (max-width: 767px) {
+  #ui-bar {
+    position: static; width: auto; height: auto;
+    border-right: 0; border-bottom: 1px solid #444; padding: 1em 1.25em;
+  }
+  #story { margin-left: 0; }
+  .passage-out { position: absolute; top: 2.5em; left: 2em; right: 2em; }
+}

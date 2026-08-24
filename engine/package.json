@@ -1,0 +1,22 @@
+{
+  "name": "milkshake",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A Twine/SugarCube-like interactive fiction engine with TypeScript expressions and file-separated projects.",
+  "scripts": {
+    "check": "tsx src/check.ts ../story",
+    "build": "npm run check && tsx src/web/build.ts ../story -o ../web-dist",
+    "new": "tsx src/web/init.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"test/*.test.ts\""
+  },
+  "dependencies": {
+    "typescript": "^5.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.0"
+  }
+}

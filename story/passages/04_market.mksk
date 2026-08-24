@@ -1,0 +1,16 @@
+:: Market
+# 市场
+
+摊位上的浆果堆得冒尖，老板娘 **莉莉** 朝你招手。
+
+- **金币**：${gold}
+- **背包**：${inventory.length ? inventory.join('、') : '（空空如也）'}
+
+<<if flags.notEnough>>莉莉摇摇头：「金币不够哦。」<</if>>
+<<if flags.bought>>莉莉笑盈盈地收下金币，把东西塞进你手里。<</if>>
+
+<<button "买一瓶牛奶（5 金币，战斗中恢复 25 体力）">>if (gold >= 5) { gold -= 5; inventory.push('牛奶'); flags.bought = true; flags.notEnough = false } else { flags.notEnough = true }<</button>>
+<<button "买一篮草莓（12 金币）">>if (gold >= 12) { gold -= 12; inventory.push('草莓'); flags.bought = true; flags.notEnough = false } else { flags.notEnough = true }<</button>>
+<<button "买一枚幸运护身符（20 金币）">>if (gold >= 20) { gold -= 20; inventory.push('护身符'); flags.bought = true; flags.notEnough = false } else { flags.notEnough = true }<</button>>
+
+[[回到广场->Village]]

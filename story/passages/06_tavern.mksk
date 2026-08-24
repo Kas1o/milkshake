@@ -1,0 +1,14 @@
+:: Tavern
+# 云端酒馆
+
+酒馆里暖意融融，酒保 **老雷** 敲着杯子：「今日特供！」
+
+<<for _d of drinks>>
+<<if gold >= _d.price>>
+<<button `${_d.name}（${_d.price} 金币，恢复 ${_d.heal} 体力）`>>gold -= _d.price; hp = Math.min(hp + _d.heal, maxhp)<</button>>
+<<else>>
+${_d.name}（需要 ${_d.price} 金币，金币不足）
+<</if>>
+<</for>>
+
+[[回到广场->Village]]

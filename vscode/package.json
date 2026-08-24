@@ -1,0 +1,58 @@
+{
+  "name": "milkshake",
+  "displayName": "Milkshake",
+  "description": "Language support for Milkshake interactive fiction (.mksk)",
+  "version": "0.1.0",
+  "publisher": "milkshake",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./dist/client.js",
+  "activationEvents": [
+    "onLanguage:milkshake"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "milkshake",
+        "aliases": [
+          "Milkshake",
+          "milkshake"
+        ],
+        "extensions": [
+          ".mksk"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "milkshake",
+        "scopeName": "source.milkshake",
+        "path": "./syntaxes/milkshake.tmLanguage.json"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"test/*.test.ts\""
+  },
+  "dependencies": {
+    "typescript": "^5.5.0",
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.0"
+  }
+}

@@ -1,0 +1,24 @@
+:: MilkShade
+# 奶昔之影
+
+树林深处，一团翻涌的紫色奶昔渐渐凝聚成人形，发出低沉的笑声。
+
+<<enemy "奶昔之影" 40 15>>
+它冷笑：「把『云端配方』交出来，否则你的故事就在这里结束！」
+<</enemy>>
+
+<<if enemyHp > 0>>
+<<button "攻击（掷 dice(6) 造成伤害）">>enemyHp = Math.max(enemyHp - dice(6), 0); if (dice(4) > 1) { hp -= dice(3) }<</button>>
+<<button "喝一瓶牛奶（恢复 25 体力）">>if (hasItem('牛奶')) { inventory.splice(inventory.indexOf('牛奶'), 1); hp = Math.min(hp + 25, maxhp); flags.noMilk = false } else { flags.noMilk = true }<</button>>
+[[逃跑->Village][flags.inBattle = false]]
+
+<<if flags.noMilk>>你翻了翻背包，发现没有牛奶了！<</if>>
+<<else>>
+**奶昔之影** 轰然溃散，化作一地金灿灿的泡沫。
+
+<<set gold += enemyGold, flags.bossDefeated = true, flags.inBattle = false, flags.quest = "把胜利带回云端奶昔铺">>
+
+<<heal 10>>
+
+[[凯旋而归->Village]]
+<</if>>

@@ -1,0 +1,25 @@
+:: Village
+# 小镇广场（第 ${day} 天）
+
+${status()}
+
+阳光洒在石板路上，远处传来搅拌机低沉的轰鸣。
+
+<<if flags.quest>>- 当前目标：**${flags.quest}**<</if>>
+
+<<if flags.bossDefeated>>
+> 传说中的**奶昔之影**已被你击败！小镇重新响起快乐的搅拌声。
+
+[[把胜利带回云端奶昔铺（结局）->Ending]]
+<</if>>
+
+[[去市场逛逛->Market]]
+[[前往森林深处->Forest]]
+[[走进酒馆->Tavern]]
+<<link "睡上一觉（恢复体力，进入下一天）">>Sleep<</link>>
+<<button "喝一口招牌奶昔（恢复 20 体力）">>hp = Math.min(hp + 20, maxhp)<</button>>
+<<button "把小费投进罐子">>let _tip: number = dice(4); gold += _tip; lastTip = _tip<</button>>
+
+<<if lastTip>>刚才罐子叮当一响，你投进了 ${lastTip} 金币。<</if>>
+
+[[查看状态->Status]]

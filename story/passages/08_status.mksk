@@ -1,0 +1,16 @@
+:: Status
+# 状态
+
+<<widget "stat" _value _label>>
+- ${_label}：**${_value}**
+<</widget>>
+
+姓名：**${name || '无名旅人'}**
+<<stat ${gold} `金币`>>
+<<stat ${hp} `体力（${maxhp}）`>>
+<<stat ${day} `天数`>>
+<<stat ${inventory.length} `物品数`>>
+
+- 背包：${inventory.length ? inventory.join('、') : '（空空如也）'}
+
+[[返回广场->Village]]
