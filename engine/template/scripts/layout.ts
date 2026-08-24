@@ -56,7 +56,10 @@ export const layout = {
       captionEl.style.display = 'none';
     }
 
+    // 移除所有多余的历史段落，只保留可能正在淡出的最旧一段，避免快速点击时堆积出重复界面。
     const passagesEl = document.getElementById('passages');
+    const children = [...passagesEl.children];
+    for (let i = 1; i < children.length; i++) children[i].remove();
     const old = passagesEl.firstElementChild;
     if (old) old.classList.add('passage-out');
 

@@ -64,29 +64,45 @@ export async function runStory(bundle: StoryBundle): Promise<void> {
   let current: RenderResult | null = null;
   let ctrl: StoryController;
 
-  const advance = async () => {
-    let guard = 0;
+  // Serialize navigation so fast clicks can't trigger overlapping renders,
+  // which is what produces duplicated passages.
+  let busy = false;
+  const guard =
+    <A extends unknown[]>(fn: (...args: A) => Promise<void>) =>
+    async (...args: A): Promise<void> => {
+      if (busy) return;
+      busy = true;
+      try {
+        await fn(...args);
+      } finally {
+        busy = false;
+      }
+    };
+
+  const rawAdvance = async () => {
+    let guardCount = 0;
     while (engine.pendingNav) {
-      if (++guard > 200) break;
+      if (++guardCount > 200) break;
       current = (await engine.consumePendingNav())!;
     }
     if (!current) current = await engine.renderCurrent();
     await layout.render(ctrl, current);
   };
+  const advance = guard(rawAdvance);
 
   ctrl = {
     engine,
     md: mdToHtml,
     advance,
-    restart: async () => {
+    restart: guard(async () => {
       engine.reset();
       current = await engine.start();
-      await advance();
-    },
-    choose: async id => {
+      await rawAdvance();
+    }),
+    choose: guard(async id => {
       current = (await engine.choose(id)) ?? current;
-      await advance();
-    },
+      await rawAdvance();
+    }),
   };
 
   layout.init(ctrl);
