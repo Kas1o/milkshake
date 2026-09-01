@@ -110,9 +110,11 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
       const m = a.match(/^\w+\s+(?:of|in)\s+(.+)$/);
       if (m) addExpr(passage, 'expr', m[1], locals);
       else {
-        const m2 = a.match(/^\w+\s+(?:from|upto|until|to|downto)\s+(.+)$/);
-        if (m2) addExpr(passage, 'expr', m2[1], locals);
-        else {
+        // `from A (upto|until|to|downto) B`, or shorthand `(upto|until|to|downto) B`.
+        const bounds = forRangeBounds(a);
+        if (bounds.from) addExpr(passage, 'expr', bounds.from, locals);
+        if (bounds.to) addExpr(passage, 'expr', bounds.to, locals);
+        if (!bounds.from && !bounds.to) {
           // C-style: `i = 0; i < n; i++`. The loop var is declared as a local
           // at runtime, so the cond / step / init snippets must see it too.
           const parts = splitTopSemicolons(a);
@@ -297,6 +299,22 @@ function forLoopVar(args: string): string | undefined {
   const init = splitTopSemicolons(a)[0] ?? '';
   const m2 = init.match(/^\s*(?:let\s+|const\s+|var\s+)?([A-Za-z_$][\w$]*)\s*=/);
   return m2 ? m2[1] : undefined;
+}
+
+/** Split a `for` range into the `from` / `to` sub-expressions (mirrors the
+ * runtime grammar in macros.ts), or `{}` if it isn't a range form. */
+function forRangeBounds(args: string): { from?: string; to?: string } {
+  const a = args.trim();
+  const m = a.match(/^\w+\s+(?:from|upto|until|to|downto)\s+(.+)$/);
+  if (!m) return {};
+  const kind = /^\w+\s+(from)\s/.test(a) ? 'from' : 'shorthand';
+  if (kind === 'from') {
+    const mm = m[1].match(/^(.+?)\s+(upto|until|to|downto)\s+(.+)$/);
+    if (!mm) return {};
+    return { from: mm[1].trim(), to: mm[3].trim() };
+  }
+  // Shorthand `(upto|until|to|downto) B` — from is implied 1.
+  return { to: m[1].trim() };
 }
 
 interface CollectedScriptInfo {

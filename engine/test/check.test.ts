@@ -107,3 +107,19 @@ test('check does not flag the loop var of a JS-style for', async () => {
     issues => assert.deepEqual(issues, []),
   );
 });
+
+test('check does not flag from/upto range forms', async () => {
+  await withStory(
+    {
+      'vars.ts': 'export default { n: 5, m: 2 };\n',
+      'a.mksk': [
+        ':: A',
+        '<<for i from 1 upto n>>${i}<</for>>',
+        '<<for i from m until n>>x<</for>>',
+        '<<for i from n downto 1>>x<</for>>',
+        '<<for i upto n>>x<</for>>',
+      ].join('\n'),
+    },
+    issues => assert.deepEqual(issues, []),
+  );
+});
