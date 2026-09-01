@@ -26,21 +26,24 @@ export function parseHeader(raw: string): {
   tags: string[];
   metadata: Record<string, string>;
 } {
-  let title = raw.trim();
+  let h = raw.trim();
   const tags: string[] = [];
   const metadata: Record<string, string> = {};
-  let m: RegExpMatchArray | null;
-  while ((m = title.match(/^(.*?)\s*[{\[]([^}\]\[]*)[}\]]\s*$/))) {
-    tags.push(...m[2].split(/\s+/).filter(Boolean));
-    title = m[1].trim();
-  }
-  const parts = title.split(/\s+/);
-  while (parts.length > 1 && /^\w+:\S+$/.test(parts[parts.length - 1])) {
-    const kv = parts.pop()!;
+
+  // Pull out every {..} / [..] group as a tag, wherever it appears.
+  h = h.replace(/[{\[]([^}\]\[]*)[}\]]/g, (_, inner: string) => {
+    tags.push(...inner.split(/\s+/).filter(Boolean));
+    return ' ';
+  });
+
+  // Trailing `key:val` pairs become metadata.
+  const tokens = h.trim().split(/\s+/);
+  while (tokens.length > 1 && /^\w+:\S+$/.test(tokens[tokens.length - 1])) {
+    const kv = tokens.pop()!;
     const idx = kv.indexOf(':');
     metadata[kv.slice(0, idx)] = kv.slice(idx + 1);
   }
-  return { title: parts.join(' ') || 'Untitled', tags, metadata };
+  return { title: tokens.join(' ') || 'Untitled', tags, metadata };
 }
 
 export function parsePassageFile(text: string, file?: string): PassageSource[] {

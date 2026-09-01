@@ -3,7 +3,25 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createEngine, loadProject, importTsFile, walk } from '../src/index.js';
+import { createEngine, loadProject, importTsFile, walk, parseHeader } from '../src/index.js';
+
+test('parseHeader extracts tags anywhere and trailing metadata', () => {
+  assert.deepEqual(parseHeader('Start {start} meta:key=val'), {
+    title: 'Start',
+    tags: ['start'],
+    metadata: { meta: 'key=val' },
+  });
+  assert.deepEqual(parseHeader('My Title {a} {b} x:1 y:2'), {
+    title: 'My Title',
+    tags: ['a', 'b'],
+    metadata: { x: '1', y: '2' },
+  });
+  assert.deepEqual(parseHeader('Plain Title'), {
+    title: 'Plain Title',
+    tags: [],
+    metadata: {},
+  });
+});
 
 test('walk skips node_modules / web-dist / .git', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'milkshake-'));
