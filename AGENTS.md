@@ -88,6 +88,7 @@ ${gold}                      // 表达式插值
 - `story/index.html`：页面外壳（必须加载 `./story.js`）；`story/styles.css`：被复制为 `story.css` 并注入 `<head>`（模板里含 `<!--story-css-->` 占位符）。
 - `story/passages/*.mksk`：按编号前缀排序（`00_ui` 起）。
 - 校验器会收集脚本注册的助手与块级宏名（`collectScriptInfo`），再对全部表达式做类型检查（`typeCheckSnippets` 用 `typescript` API 离线检查）。
+- **宏签名**：`MacroDef.signature`（`MacroSignature`，见 `engine/src/engine/macros.ts`）是**编译期元数据**——描述宏的参数（`params` / `rest`，每参数含 `name` / `type` / `optional`）。有签名时，`checkStory` 会校验每次宏调用的**参数个数**并对其做**类型检查**（`type` 相对故事 `vars.ts` 的导出类型解析，如 `Drink` → `import('./story-vars').Drink`）。核心宏、脚本注册宏、`<<widget>>`（参数可写 `name:type`）都参与。LSP 在补全详情与 hover 里展示签名。设计初衷：**能在编译期/检查期报的错，不拖到运行时**。
 
 ## 引擎核心文件（engine/src/）
 
