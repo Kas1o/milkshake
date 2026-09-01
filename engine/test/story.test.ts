@@ -3,7 +3,31 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createEngine, loadProject, importTsFile } from '../src/index.js';
+import { createEngine, loadProject, importTsFile, walk } from '../src/index.js';
+
+test('walk skips node_modules / web-dist / .git', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'milkshake-'));
+  try {
+    await mkdir(join(dir, 'passages'));
+    await mkdir(join(dir, 'node_modules', 'pkg', 'src'), { recursive: true });
+    await mkdir(join(dir, 'web-dist'));
+    await mkdir(join(dir, '.git'));
+    await writeFile(join(dir, 'passages', 'a.mksk'), ':: A\n');
+    await writeFile(join(dir, 'node_modules', 'pkg', 'src', 'skip.mksk'), ':: Skip\n');
+    await writeFile(join(dir, 'web-dist', 'skip.mksk'), ':: Skip\n');
+    await writeFile(join(dir, '.git', 'skip.mksk'), ':: Skip\n');
+    await writeFile(join(dir, 'scripts.ts'), 'export const x = 1;\n');
+    const files = await walk(dir, p => /\.(mksk|ts)$/.test(p));
+    const rel = files.map(f => f.replace(dir, '').replace(/\\/g, '/'));
+    assert.ok(rel.some(f => f.endsWith('passages/a.mksk')));
+    assert.ok(rel.some(f => f.endsWith('scripts.ts')));
+    assert.ok(!rel.some(f => f.includes('node_modules')));
+    assert.ok(!rel.some(f => f.includes('web-dist')));
+    assert.ok(!rel.some(f => f.includes('.git')));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 test('loadProject reads passages and TS scripts from a directory', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'milkshake-'));

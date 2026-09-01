@@ -94,6 +94,7 @@ function snapshot(dir: string, prefix = ''): Map<string, [number, number]> {
 }
 
 const INTERESTING = /\.(mksk|ts|html|css)$/i;
+const IGNORED = /(^|[\\/])(node_modules|web-dist|dist|\.git|\.svn|\.hg)([\\/]|$)/;
 
 export async function devServer(dirArg?: string, outArg?: string, port = 5173): Promise<void> {
   const cwd = process.cwd();
@@ -128,6 +129,7 @@ export async function devServer(dirArg?: string, outArg?: string, port = 5173): 
   console.log('正在监听 ' + dir + ' 的改动……');
   watchTree(dir, rel => {
     if (!INTERESTING.test(rel)) return;
+    if (IGNORED.test(rel.replace(/\\/g, '/'))) return;
     console.log(`检测到改动：${relative(dir, join(dir, rel))}`);
     build();
   });

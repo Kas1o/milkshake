@@ -7,10 +7,13 @@ import type { Engine } from './engine.js';
 import { makeContext } from './engine.js';
 import type { PassageSource, Vars } from '../types.js';
 
+const IGNORED_DIRS = new Set(['node_modules', 'web-dist', 'dist', '.git', '.svn', '.hg']);
+
 export async function walk(dir: string, predicate: (f: string) => boolean): Promise<string[]> {
   const out: string[] = [];
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
   for (const e of entries) {
+    if (e.isDirectory() && IGNORED_DIRS.has(e.name)) continue;
     const p = join(dir, e.name);
     if (e.isDirectory()) out.push(...(await walk(p, predicate)));
     else if (predicate(p)) out.push(p);
