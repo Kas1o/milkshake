@@ -123,3 +123,13 @@ test('check does not flag from/upto range forms', async () => {
     issues => assert.deepEqual(issues, []),
   );
 });
+
+test('check finds widgets defined inside a block macro', async () => {
+  await withStory(
+    {
+      'vars.ts': VARS,
+      'a.mksk': ':: A\n<<if gold > 0>><<widget "inset" v>>[${v}]<</widget>><</if>>\n<<inset 3>>\n',
+    },
+    issues => assert.deepEqual(issues, []),
+  );
+});

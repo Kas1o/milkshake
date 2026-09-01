@@ -70,15 +70,14 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
   // Locate <<widget>> definitions for arity checks and param scoping.
   const widgets = new Map<string, string[]>();
   for (const [title, nodes] of parsed) {
-    for (const n of nodes) {
-      if (n.kind === 'macro' && n.name === 'widget') {
-        const w = widgetDef(n);
-        if (!w) {
-          issues.push({ passage: title, message: '<<widget>> 缺少名称' });
-          continue;
-        }
-        widgets.set(w.name, w.params);
+    for (const n of allNodes(nodes)) {
+      if (n.kind !== 'macro' || n.name !== 'widget') continue;
+      const w = widgetDef(n);
+      if (!w) {
+        issues.push({ passage: title, message: '<<widget>> 缺少名称' });
+        continue;
       }
+      widgets.set(w.name, w.params);
     }
   }
   const knownMacros = new Set([...CORE_MACRO_NAMES, ...widgets.keys(), ...scriptInfo.macros]);
@@ -234,6 +233,17 @@ function widgetDef(n: Node): { name: string; params: string[] } | null {
   return name ? { name, params: toks.slice(1) } : null;
 }
 
+/** Depth-first visit of every node in a tree, including block bodies. */
+function* allNodes(nodes: Node[]): Generator<Node, void, undefined> {
+  for (const n of nodes) {
+    yield n;
+    if (n.kind === 'macro') {
+      if (n.content) yield* allNodes(n.content);
+      for (const b of n.branches ?? []) yield* allNodes(b.nodes);
+    }
+  }
+}
+
 /** Knowledge about a story project, gathered once for editor tooling (LSP). */
 export interface StoryInfo {
   titles: Set<string>;
@@ -259,7 +269,7 @@ export async function collectStoryInfo(dir: string): Promise<StoryInfo> {
   const widgets = new Map<string, string[]>();
   for (const s of sources) {
     try {
-      for (const n of parseNodes(s.source, { blockMacros })) {
+      for (const n of allNodes(parseNodes(s.source, { blockMacros }))) {
         const w = widgetDef(n);
         if (w) widgets.set(w.name, w.params);
       }
