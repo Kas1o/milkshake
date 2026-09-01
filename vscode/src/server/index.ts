@@ -41,7 +41,9 @@ function scheduleDiagnostics(doc: TextDocument) {
   const uri = doc.uri;
   const old = debounceTimers.get(uri);
   if (old) clearTimeout(old);
-  debounceTimers.set(uri, setTimeout(() => void refreshDiagnostics(doc), 500));
+  // Short debounce: the whole-project check is cheap now (~tens of ms thanks to
+  // the incremental type-check session), so feedback appears almost immediately.
+  debounceTimers.set(uri, setTimeout(() => void refreshDiagnostics(doc), 120));
 }
 
 /** The checker runs per story root, so every refresh re-reports all files. */

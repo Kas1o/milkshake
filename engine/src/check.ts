@@ -251,6 +251,7 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
     const shadowed = new Set([...scriptInfo.helpers, ...BUILTIN_HELPER_NAMES]);
     issues.push(
       ...typeCheckSnippets({
+        root: dir,
         varNames: Object.keys(vars).filter(k => !shadowed.has(k)),
         helperNames: [...scriptInfo.helpers],
         varsSource: readFileSync(varsPath, 'utf8'),
@@ -475,10 +476,63 @@ async function collectScriptInfo(dir: string): Promise<CollectedScriptInfo> {
 }
 
 interface TypeCheckInput {
+  /** Story root, used to key the persistent (incremental) TS session. */
+  root: string;
   varNames: string[];
   helperNames: string[];
   varsSource: string;
   snippets: Map<string, ExprSnippet[]>;
+}
+
+/** A persistent TypeScript LanguageService per story root. The language
+ * service keeps incremental per-file caches, so re-checking just the edited
+ * passage's snippets is ~10ms instead of re-analyzing the whole project. */
+interface TypeCheckSession {
+  files: Map<string, { text: string; version: number }>;
+  service: ts.LanguageService;
+  options: ts.CompilerOptions;
+}
+const typeCheckSessions = new Map<string, TypeCheckSession>();
+
+function createTypeCheckSession(): TypeCheckSession {
+  const files = new Map<string, { text: string; version: number }>();
+  const options = makeOptions();
+  const read = (f: string): string | undefined => {
+    const e = files.get(f);
+    if (e) return e.text;
+    const libPath = ts.getDefaultLibFilePath(options);
+    if (f === libPath || f.endsWith('.d.ts')) {
+      try {
+        return readFileSync(require_.resolve(`typescript/lib/${f.split('/').pop()}`), 'utf8');
+      } catch {
+        return undefined;
+      }
+    }
+    return undefined;
+  };
+  const host: ts.LanguageServiceHost = {
+    getCompilationSettings: () => options,
+    getScriptFileNames: () => [...files.keys()],
+    getScriptVersion: f => String(files.get(f)?.version ?? 0),
+    getScriptSnapshot: f => {
+      const t = read(f);
+      return t === undefined ? undefined : ts.ScriptSnapshot.fromString(t);
+    },
+    getCurrentDirectory: () => '/check',
+    getDefaultLibFileName: o => ts.getDefaultLibFilePath(o),
+    fileExists: f => read(f) !== undefined,
+    readFile: f => read(f),
+  };
+  const service = ts.createLanguageService(host, ts.createDocumentRegistry());
+  return { files, service, options };
+}
+
+/** Write `text` to the session's virtual file, bumping the version only when
+ * the content actually changed (so unchanged snippets keep cached results). */
+function setVirtualFile(files: Map<string, { text: string; version: number }>, name: string, text: string) {
+  const prev = files.get(name);
+  if (prev && prev.text === text) return;
+  files.set(name, { text, version: (prev?.version ?? 0) + 1 });
 }
 
 function typeCheckSnippets(input: TypeCheckInput): CheckIssue[] {
@@ -517,15 +571,29 @@ function typeCheckSnippets(input: TypeCheckInput): CheckIssue[] {
   const reserved = new Set([...input.varNames, ...input.helperNames, ...BUILTIN_HELPER_NAMES]);
   const exportedTypes = exportedTypeNames(input.varsSource);
 
-  const files = new Map<string, string>([[varsPath, input.varsSource]]);
-  const origin = new Map<string, { passage: string; code: string }>();
+  // Reuse a persistent LanguageService session per root so only the edited
+  // passage's snippets are re-analyzed (much faster than a fresh program).
+  let session = typeCheckSessions.get(input.root);
+  if (!session) {
+    session = createTypeCheckSession();
+    typeCheckSessions.set(input.root, session);
+  }
+  const { files, service } = session;
 
-  let seq = 0;
+  setVirtualFile(files, varsPath, input.varsSource);
+  // Each passage maps to ONE virtual file (all its snippets as namespaces), so
+  // editing expressions inside an existing passage is a content change to an
+  // existing file → the language service re-checks it incrementally (~10ms).
+  // Only adding/removing an entire passage forces a program rebuild.
+  const passageFiles = new Map<string, { passage: string; ranges: { start: number; end: number; code: string }[] }>();
+  const currentNames = new Set<string>();
+
   for (const [passage, list] of input.snippets) {
+    const name = `/check/${sanitizeFileName(passage)}.ts`;
+    let content = '';
+    const ranges: { start: number; end: number; code: string }[] = [];
+    let idx = 0;
     for (const s of list) {
-      const name = `/check/snippet-${seq++}.ts`;
-      // Namespace per snippet: locals and __check never collide across files,
-      // and locals shadowing a var/helper must not redeclare it.
       const locals = [...new Set(s.locals)]
         .filter(l => !reserved.has(l))
         .map(l => `  let ${l}: any;`)
@@ -541,35 +609,41 @@ function typeCheckSnippets(input: TypeCheckInput): CheckIssue[] {
       } else {
         body = s.mode === 'expr' ? `    return (${s.code});` : indent(s.code);
       }
-      files.set(
-        name,
-        `namespace __s${seq} {\n${env.join('\n')}\n${locals}\n${checkDecl}  function __check() {\n${body}\n  }\n}\n`,
-      );
-      origin.set(name, { passage, code: s.code });
+      const start = content.length;
+      content += `namespace __s${idx} {\n${env.join('\n')}\n${locals}\n${checkDecl}  function __check() {\n${body}\n  }\n}\n`;
+      ranges.push({ start, end: content.length, code: s.code });
+      idx++;
     }
+    setVirtualFile(files, name, content);
+    currentNames.add(name);
+    passageFiles.set(name, { passage, ranges });
   }
-  if (!seq) return issues;
+  // Drop virtual files whose passage no longer has expressions.
+  for (const key of [...files.keys()]) {
+    if (key !== varsPath && !currentNames.has(key)) files.delete(key);
+  }
+  if (!passageFiles.size) return issues;
 
-  const options = makeOptions();
-  const program = ts.createProgram([...files.keys()], options, makeHost(files, options));
-  for (const [name, info] of origin) {
-    const sf = program.getSourceFile(name);
-    if (!sf) continue;
+  for (const [name, pf] of passageFiles) {
     const diags = [
-      ...program.getSyntacticDiagnostics(sf),
-      ...program.getSemanticDiagnostics(sf),
+      ...service.getSyntacticDiagnostics(name),
+      ...service.getSemanticDiagnostics(name),
     ];
     for (const d of diags) {
+      const range =
+        (d.start !== undefined ? pf.ranges.find(r => d.start! >= r.start && d.start! < r.end) : undefined) ??
+        pf.ranges[0] ??
+        null;
       let where = '';
       if (d.file && d.start !== undefined && d.length !== undefined) {
         const near = d.file.getFullText().slice(d.start, d.start + d.length);
         if (near.trim()) where = `（靠近 "${truncate(near)}"）`;
       }
       issues.push({
-        passage: info.passage,
+        passage: pf.passage,
         message:
           `类型错误${where}：${ts.flattenDiagnosticMessageText(d.messageText, ' ')}` +
-          `\n    代码：${truncate(info.code, 120)}`,
+          `\n    代码：${truncate(range?.code ?? '', 120)}`,
       });
     }
   }
@@ -596,42 +670,16 @@ const require_ = createRequire(
   typeof __filename !== 'undefined' ? __filename : import.meta.url,
 );
 
-function makeHost(files: Map<string, string>, options: ts.CompilerOptions): ts.CompilerHost {
-  const libPath = ts.getDefaultLibFilePath(options);
-  const libText = readFileSync(libPath, 'utf8');
-  const read = (f: string): string | undefined => {
-    if (files.has(f)) return files.get(f);
-    if (f === libPath || f.endsWith('.d.ts')) {
-      // Resolve lib files relative to the bundled typescript package.
-      try {
-        return readFileSync(require_.resolve(`typescript/lib/${f.split('/').pop()}`), 'utf8');
-      } catch {
-        return f === libPath ? libText : undefined;
-      }
-    }
-    return undefined;
-  };
-  return {
-    getSourceFile: (fileName, languageVersion) => {
-      const text = read(fileName);
-      return text !== undefined ? ts.createSourceFile(fileName, text, languageVersion, true) : undefined;
-    },
-    getDefaultLibFileName: () => libPath,
-    writeFile: () => {},
-    getCurrentDirectory: () => '/check',
-    getCanonicalFileName: f => f,
-    useCaseSensitiveFileNames: () => true,
-    getNewLine: () => '\n',
-    fileExists: f => read(f) !== undefined,
-    readFile: read,
-    getDirectories: () => [],
-    directoryExists: () => true,
-  };
-}
-
 function truncate(s: string, max = 60): string {
   const t = s.replace(/\s+/g, ' ').trim();
   return t.length > max ? t.slice(0, max) + '…' : t;
+}
+
+/** Passage titles can contain spaces / CJK / symbols; map to a stable, safe
+ * file-name stem so snippet files stay stable across edits to other passages. */
+function sanitizeFileName(title: string): string {
+  const t = title.replace(/[^A-Za-z0-9_]/g, '_');
+  return t || 'passage';
 }
 
 function indent(code: string): string {
