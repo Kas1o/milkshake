@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
 import { Engine, makeContext } from './engine/engine.js';
-import { coreMacros } from './engine/macros.js';
+import { coreMacros, splitTopSemicolons } from './engine/macros.js';
 import { parseNodes, splitArgs } from './engine/parser.js';
 import { walk, parsePassageFile, loadVars, isSpecialScript, importTsFile, resolveStoryDir } from './engine/story.js';
 import type { Node, PassageSource } from './types.js';
@@ -43,6 +43,15 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
   }
   const titles = new Set(sources.map(s => s.title));
   const locations = passageLocations(sources);
+
+  // Duplicate passage titles silently overwrite each other at load time.
+  const seen = new Set<string>();
+  for (const s of sources) {
+    if (seen.has(s.title)) {
+      issues.push({ passage: s.title, message: `段落「${s.title}」重复定义，后面的会覆盖前面的` });
+    }
+    seen.add(s.title);
+  }
 
   // Install story scripts against a throwaway engine to learn helper names
   // and script-registered block macros (e.g. <<enemy>>) before parsing.
@@ -104,7 +113,7 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
         const m2 = a.match(/^\w+\s+(?:from|upto|until|to|downto)\s+(.+)$/);
         if (m2) addExpr(passage, 'expr', m2[1], locals);
         else {
-          const parts = a.split(';');
+          const parts = splitTopSemicolons(a);
           if (parts[1]?.trim()) addExpr(passage, 'expr', parts[1], locals);
         }
       }
@@ -276,7 +285,7 @@ function forLoopVar(args: string): string | undefined {
   const a = args.trim();
   const m = a.match(/^(\w+)\s+(?:of|in)\s+/) ?? a.match(/^(\w+)\s+(?:from|upto|until|to|downto)\s+/);
   if (m) return m[1];
-  const init = a.split(';')[0] ?? '';
+  const init = splitTopSemicolons(a)[0] ?? '';
   const m2 = init.match(/^\s*(?:let\s+|const\s+|var\s+)?([A-Za-z_$][\w$]*)\s*=/);
   return m2 ? m2[1] : undefined;
 }

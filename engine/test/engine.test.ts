@@ -117,8 +117,12 @@ test('button re-renders current passage', async () => {
   e.loadPassages([P('<<if !has(\'n\')>><<set n = 0>><</if>>n=${n}<<button "+">>n += 1<</button>>')]);
   const r1 = await e.start();
   assert.equal(r1.text.replace(/[\uE000](L\d+)[\uE001]/g, ''), 'n=0');
+  assert.equal(e.state.turns, 1, '开局占 1 个 turn');
   const r2 = (await e.choose(r1.links[0].id))!;
   assert.equal(r2.text.replace(/[\uE000](L\d+)[\uE001]/g, '').includes('n=1'), true);
+  // 点按钮不是导航：不应新增 turn / history 记录。
+  assert.equal(e.state.turns, 1, '按钮点击不应增加 turn');
+  assert.equal(e.state.history.length, 1, '按钮点击不应新增 history');
 });
 
 test('button setup captures loop scope', async () => {

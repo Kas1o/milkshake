@@ -83,3 +83,17 @@ test('check flags widget arity mismatch', async () => {
     },
   );
 });
+
+test('check flags duplicate passage titles', async () => {
+  await withStory(
+    {
+      'vars.ts': VARS,
+      'a.mksk': ':: Start\nfirst\n',
+      'b.mksk': ':: Start\nsecond\n',
+    },
+    issues => {
+      assert.ok(issues.some(i => i.message.includes('重复定义')));
+      assert.equal(issues.filter(i => i.message.includes('重复定义')).length, 1);
+    },
+  );
+});

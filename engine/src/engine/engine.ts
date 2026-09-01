@@ -399,7 +399,12 @@ export class Engine<T extends object = Vars> {
         this.runScript(link.setup);
       }
     }
-    if (link.kind === 'button') return this.transition(this.state.current!);
+    if (link.kind === 'button') {
+      // A button isn't navigation: re-render the current passage in place
+      // without recording a new history entry / turn.
+      this.pendingNav = null;
+      return this.renderCurrent();
+    }
     return this.transition(link.target!);
   }
 

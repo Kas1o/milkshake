@@ -35,7 +35,8 @@ export function rawText(nodes: Node[] | null): string {
   return nodes.map(x => (x.kind === 'text' ? x.text : '')).join('');
 }
 
-function splitTopSemicolons(s: string): string[] {
+/** Split on top-level semicolons, ignoring those inside quotes / brackets. */
+export function splitTopSemicolons(s: string): string[] {
   const out: string[] = [];
   let cur = '';
   let quote = '';
