@@ -48,7 +48,7 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
   const seen = new Set<string>();
   for (const s of sources) {
     if (seen.has(s.title)) {
-      issues.push({ passage: s.title, message: `段落「${s.title}」重复定义，后面的会覆盖前面的` });
+      issues.push({ passage: s.title, message: `「${s.title}」重复定义，后面的会覆盖前面的` });
     }
     seen.add(s.title);
   }
@@ -542,7 +542,10 @@ if (isMain) {
         console.log('静态检查通过：未发现问题。');
         return;
       }
-      for (const i of issues) console.error(`✗ 段落「${i.passage}」：${i.message}`);
+      for (const i of issues) {
+        const loc = i.file ? ` (${i.file}${i.line !== undefined ? ':' + (i.line + 1) : ''})` : '';
+        console.error(`✗ 段落「${i.passage}」：${i.message}${loc}`);
+      }
       console.error(`\n共发现 ${issues.length} 个问题。`);
       process.exit(1);
     })
