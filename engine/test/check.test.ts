@@ -133,3 +133,13 @@ test('check finds widgets defined inside a block macro', async () => {
     issues => assert.deepEqual(issues, []),
   );
 });
+
+test('check knows the vars / state / engine built-ins', async () => {
+  await withStory(
+    {
+      'vars.ts': VARS,
+      'a.mksk': ':: A\n${vars.gold} ${state.turns} ${engine.options.name}\n',
+    },
+    issues => assert.deepEqual(issues, []),
+  );
+});

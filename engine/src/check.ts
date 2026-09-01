@@ -421,6 +421,15 @@ function typeCheckSnippets(input: TypeCheckInput): CheckIssue[] {
     '  declare function get(key: string): unknown;',
     '  declare function has(key: string): boolean;',
     '  declare function str(value: unknown): string;',
+    // The remaining built-ins are plain values / engine handles, typed loosely
+    // so `vars.gold`, `state.current`, `engine.options.name` all type-check.
+    '  declare const vars: typeof __vars;',
+    `  declare const state: {
+      variables: typeof __vars; history: string[]; turns: number;
+      current?: string; previous?: string; visits: Map<string, number>;
+      visited(name: string): number;
+    };`,
+    '  declare const engine: { options: { name: string; start: string; uid?: string } };',
   );
   for (const h of input.helperNames) env.push(`  declare function ${h}(...args: any[]): any;`);
   const reserved = new Set([...input.varNames, ...input.helperNames, ...BUILTIN_HELPER_NAMES]);
