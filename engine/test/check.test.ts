@@ -240,3 +240,27 @@ test('core macro args are type-checked (goto/button labels must be strings)', as
     },
   );
 });
+
+test('check uses the in-memory override instead of the stale on-disk file', async () => {
+  // Disk has a valid passage; the in-memory edit introduces an unclosed block.
+  const dir = await mkdtemp(join(tmpdir(), 'milkshake-check-'));
+  try {
+    const p = join(dir, 'a.mksk');
+    await mkdir(dirname(p), { recursive: true });
+    await writeFile(p, ':: A\n<<button "x">>gold = 1<</button>>\n');
+    // Unclosed on disk should be reported by a normal check.
+    await writeFile(p, ':: A\n<<button "x">>\n');
+    let issues = await checkStory(dir);
+    assert.ok(issues.some(i => i.message.includes('解析失败')), 'disk unclosed should be flagged');
+
+    // Restore disk to valid; the override makes the checker see the unclosed edit.
+    await writeFile(p, ':: A\n<<button "x">>gold = 1<</button>>\n');
+    issues = await checkStory(dir, {
+      read: path => (path === p ? ':: A\n<<button "x">>\n' : undefined),
+    });
+    assert.ok(issues.some(i => i.message.includes('解析失败')), 'override unclosed should be flagged');
+    assert.ok(issues.some(i => i.passage === 'A'));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

@@ -1,12 +1,39 @@
 import { pathToFileURL } from 'node:url';
 import type { Diagnostic } from 'vscode-languageserver';
 import { DiagnosticSeverity } from 'vscode-languageserver';
-import { checkStory } from '../../../engine/src/check.js';
+import type { TextDocument } from 'vscode-languageserver-textdocument';
+import { checkStory, type CheckOptions } from '../../../engine/src/check.js';
 import { lineLength } from '../shared/locate.js';
 
+/** Serves open, unsaved documents from memory instead of their stale on-disk
+ * copy, so the checker reflects the current edit immediately. */
+export interface OpenTextSource {
+  /** checkStory/collectStoryInfo override: in-memory text for a path, if open. */
+  read(path: string): string | undefined;
+  /** Stable key reflecting open-document content, for cache invalidation. */
+  openKey(): string;
+}
+
+export function openTextSource(
+  documents: { get(uri: string): TextDocument | undefined; all(): TextDocument[] },
+): OpenTextSource {
+  const read = (path: string) => documents.get(pathToFileURL(path).href)?.getText();
+  const openKey = () =>
+    documents
+      .all()
+      .filter(d => d.languageId === 'milkshake')
+      .sort((a, b) => (a.uri < b.uri ? -1 : a.uri > b.uri ? 1 : 0))
+      .map(d => `${d.uri}:${d.version}`)
+      .join('|');
+  return { read, openKey };
+}
+
 /** Run the engine checker over the story root and group issues per file. */
-export async function computeDiagnostics(root: string): Promise<Map<string, Diagnostic[]>> {
-  const issues = await checkStory(root);
+export async function computeDiagnostics(
+  root: string,
+  opts: CheckOptions = {},
+): Promise<Map<string, Diagnostic[]>> {
+  const issues = await checkStory(root, opts);
   const byFile = new Map<string, Diagnostic[]>();
   for (const i of issues) {
     if (!i.file) continue;

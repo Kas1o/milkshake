@@ -37,12 +37,19 @@ export const BUILTIN_HELPER_NAMES = [
   'random', 'dice', 'set', 'get', 'has', 'str',
 ];
 
-export async function checkStory(dir: string): Promise<CheckIssue[]> {
+export interface CheckOptions {
+  /** Optional in-memory override for a file path (e.g. the LSP's open, unsaved
+   * document). Return the text to use, or `undefined` to fall back to disk. */
+  read?: (path: string) => string | undefined;
+}
+
+export async function checkStory(dir: string, opts: CheckOptions = {}): Promise<CheckIssue[]> {
   const issues: CheckIssue[] = [];
   const passageFiles = await walk(dir, p => /\.mksk$/i.test(p));
   const sources: PassageSource[] = [];
   for (const f of passageFiles) {
-    sources.push(...parsePassageFile(await readFile(f, 'utf8'), f));
+    const content = opts.read?.(f) ?? (await readFile(f, 'utf8'));
+    sources.push(...parsePassageFile(content, f));
   }
   const titles = new Set(sources.map(s => s.title));
   const locations = passageLocations(sources);
@@ -254,7 +261,7 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
         root: dir,
         varNames: Object.keys(vars).filter(k => !shadowed.has(k)),
         helperNames: [...scriptInfo.helpers],
-        varsSource: readFileSync(varsPath, 'utf8'),
+        varsSource: opts.read?.(varsPath) ?? readFileSync(varsPath, 'utf8'),
         snippets,
       }),
     );
@@ -322,11 +329,12 @@ export interface StoryInfo {
   varNames: string[];
 }
 
-export async function collectStoryInfo(dir: string): Promise<StoryInfo> {
+export async function collectStoryInfo(dir: string, opts: CheckOptions = {}): Promise<StoryInfo> {
   const passageFiles = await walk(dir, p => /\.mksk$/i.test(p));
   const sources: PassageSource[] = [];
   for (const f of passageFiles) {
-    sources.push(...parsePassageFile(await readFile(f, 'utf8'), f));
+    const content = opts.read?.(f) ?? (await readFile(f, 'utf8'));
+    sources.push(...parsePassageFile(content, f));
   }
   const titles = new Set(sources.map(s => s.title));
   const locations = passageLocations(sources);

@@ -7,6 +7,7 @@ import { collectStoryInfo } from '../../../engine/src/check.js';
 import { isSpecialScript, walk } from '../../../engine/src/engine/story.js';
 import { findPassageRefAt, macroNameAtLine, wordAt } from '../shared/context.js';
 import { lineLength } from '../shared/locate.js';
+import type { OpenTextSource } from './diagnostics.js';
 
 function loc(file: string, line: number, column = 0): Location {
   return Location.create(
@@ -69,16 +70,19 @@ export async function definitionAt(
   root: string,
   doc: TextDocument,
   position: Position,
+  open?: OpenTextSource,
 ): Promise<Location | null> {
   const lineText = doc.getText({
     start: { line: position.line, character: 0 },
     end: { line: position.line + 1, character: 0 },
   });
 
+  const collect = () => collectStoryInfo(root, open ? { read: open.read } : undefined);
+
   // 1) Passage references (links / <<goto>> / <<display>>).
   const ref = findPassageRefAt(lineText, position.character);
   if (ref) {
-    const info = await collectStoryInfo(root);
+    const info = await collect();
     const locInfo = info.locations.get(ref.target);
     if (locInfo) {
       const end = await lineLength(locInfo.file, locInfo.line);
@@ -94,7 +98,7 @@ export async function definitionAt(
   //    story script). Core macros have no story definition → null.
   const macro = macroNameAtLine(lineText, position.character);
   if (macro) {
-    const info = await collectStoryInfo(root);
+    const info = await collect();
     if (!info.knownMacros.has(macro)) return null;
     if (info.widgets.has(macro)) return await findWidgetDefinition(root, macro);
     return await findMacroDefinition(root, macro);
@@ -103,7 +107,7 @@ export async function definitionAt(
   // 3) Story variable → its declaration in vars.ts.
   const word = wordAt(lineText, position.character);
   if (word) {
-    const info = await collectStoryInfo(root);
+    const info = await collect();
     if (info.varNames.includes(word)) {
       return await findVarDefinition(root, word);
     }

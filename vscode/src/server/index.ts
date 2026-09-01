@@ -10,7 +10,7 @@ import {
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { findStoryRoot } from '../shared/locate.js';
-import { computeDiagnostics } from './diagnostics.js';
+import { computeDiagnostics, openTextSource, type OpenTextSource } from './diagnostics.js';
 import { cachedStoryInfo } from './storyInfo.js';
 import { completeAt } from './completion.js';
 import { definitionAt } from './definition.js';
@@ -51,13 +51,16 @@ async function refreshDiagnostics(doc: TextDocument) {
   const token = ++runToken;
   const root = findStoryRoot(fileURLToPath(doc.uri));
   if (!root) return;
+  const open: OpenTextSource = openTextSource(documents);
   running = running
     .then(async () => {
       // A newer edit superseded this run while it was queued.
       if (token !== runToken) return;
       let byFile: Awaited<ReturnType<typeof computeDiagnostics>> | undefined;
       try {
-        byFile = await computeDiagnostics(root);
+        // Serve open (possibly unsaved) documents from memory so diagnostics
+        // reflect the current edit immediately instead of the last save.
+        byFile = await computeDiagnostics(root, { read: open.read });
       } catch (err) {
         connection.console.error(`Milkshake check failed: ${err}`);
         return;
@@ -89,7 +92,7 @@ connection.onCompletion(async (params: CompletionParams) => {
   const root = findStoryRoot(fileURLToPath(doc.uri));
   if (!root) return [];
   try {
-    return await completeAt(doc, params.position, await cachedStoryInfo(root));
+    return await completeAt(doc, params.position, await cachedStoryInfo(root, openTextSource(documents)));
   } catch (err) {
     connection.console.error(`Milkshake completion failed: ${err}`);
     return [];
@@ -102,7 +105,7 @@ connection.onDefinition(async params => {
   const root = findStoryRoot(fileURLToPath(doc.uri));
   if (!root) return null;
   try {
-    return await definitionAt(root, doc, params.position);
+    return await definitionAt(root, doc, params.position, openTextSource(documents));
   } catch (err) {
     connection.console.error(`Milkshake definition failed: ${err}`);
     return null;
@@ -115,7 +118,7 @@ connection.onHover(async params => {
   const root = findStoryRoot(fileURLToPath(doc.uri));
   if (!root) return null;
   try {
-    return hoverAt(doc, params.position, await cachedStoryInfo(root));
+    return hoverAt(doc, params.position, await cachedStoryInfo(root, openTextSource(documents)));
   } catch (err) {
     connection.console.error(`Milkshake hover failed: ${err}`);
     return null;
