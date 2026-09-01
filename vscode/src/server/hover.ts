@@ -1,17 +1,7 @@
 import { Hover, MarkupContent } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import type { StoryInfo } from '../../../engine/src/check.js';
-
-/** Find `<<name` starting at or before `character` on a line. */
-function macroNameAtLine(line: string, character: number): string | null {
-  for (const m of line.matchAll(/<<(\/)?\s*([A-Za-z_][\w-]*)/g)) {
-    const start = m.index!;
-    const name = m[2];
-    const end = start + m[0].length;
-    if (character >= start && character <= end) return name;
-  }
-  return null;
-}
+import { macroNameAtLine } from '../shared/context.js';
 
 export function hoverAt(
   doc: TextDocument,

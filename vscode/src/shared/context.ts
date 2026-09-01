@@ -94,6 +94,32 @@ export function detectCompletionContext(textBefore: string): CompletionContext {
   return { kind: 'identifier' };
 }
 
+/** Find `<<name` starting at or before `character` on a line. */
+export function macroNameAtLine(line: string, character: number): string | null {
+  for (const m of line.matchAll(/<<(\/)?\s*([A-Za-z_][\w-]*)/g)) {
+    const start = m.index!;
+    const name = m[2];
+    const end = start + m[0].length;
+    if (character >= start && character <= end) return name;
+  }
+  return null;
+}
+
+/** The identifier word (`[A-Za-z_$][\w$]*`) under the cursor, if any. */
+export function wordAt(line: string, character: number): string | null {
+  const m = line.match(/[A-Za-z_$][\w$]*/g);
+  if (!m) return null;
+  let consumed = 0;
+  for (const w of m) {
+    const idx = line.indexOf(w, consumed);
+    const start = idx;
+    const end = idx + w.length;
+    if (character >= start && character <= end) return w;
+    consumed = end;
+  }
+  return null;
+}
+
 export interface PassageRef {
   target: string;
   /** Character range of the target text within the line. */
