@@ -203,6 +203,13 @@ test('declareVars after construction seeds and guards', async () => {
   assert.equal(r.text, 'hp=3');
 });
 
+test('stringify renders objects/arrays as JSON, not [object Object]', async () => {
+  const e = createEngine();
+  e.loadPassages([P('<<set arr = [1,2]>><<set obj = { a: 1 }>><<print arr>><<print obj>>')]);
+  const r = await e.start();
+  assert.equal(r.text, '[1,2]{"a":1}');
+});
+
 test('async macro suspends rendering until its promise resolves (blocking side-channel UI)', async () => {
   const e = createEngine();
   let finish!: (v: string) => void;

@@ -30,9 +30,17 @@ export function mdToHtml(md: string): string {
   };
   for (const raw of lines) {
     let l = escapeHtml(raw);
+    // Inline code must be shielded before bold/italic run, otherwise emphasis
+    // markers inside a code span (e.g. `**x**`) get turned into formatting.
+    const codeSpans: string[] = [];
+    l = l.replace(/`([^`]+)`/g, (m, body: string) => {
+      const placeholder = `\uE100${codeSpans.length}\uE101`;
+      codeSpans.push(`<code>${body}</code>`);
+      return placeholder;
+    });
     l = l.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     l = l.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-    l = l.replace(/`([^`]+)`/g, '<code>$1</code>');
+    l = l.replace(/\uE100(\d+)\uE101/g, (_, idx: string) => codeSpans[Number(idx)]);
 
     const h = l.match(/^(#{1,6})\s+(.+)$/);
     if (h) {
@@ -41,9 +49,10 @@ export function mdToHtml(md: string): string {
       out.push(`<h${level}>${h[2]}</h${level}>`);
       continue;
     }
-    if (/^>\s?/.test(l)) {
+    // escapeHtml ran above, so a leading `>` became `&gt;`.
+    if (/^&gt;\s?/.test(l)) {
       closeList();
-      out.push(`<blockquote>${l.replace(/^>\s?/, '')}</blockquote>`);
+      out.push(`<blockquote>${l.replace(/^&gt;\s?/, '')}</blockquote>`);
       continue;
     }
     const li = l.match(/^\s*[-*]\s+(.+)$/);

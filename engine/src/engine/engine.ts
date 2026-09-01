@@ -206,6 +206,15 @@ export class Engine<T extends object = Vars> {
 
   stringify(v: unknown): string {
     if (v === null || v === undefined) return '';
+    if (typeof v === 'object') {
+      // Arrays / plain objects are shown as JSON so story authors don't get
+      // "[object Object]" in interpolation or <<print>> output.
+      try {
+        return JSON.stringify(v);
+      } catch {
+        // Circular refs, etc.
+      }
+    }
     return String(v);
   }
 
