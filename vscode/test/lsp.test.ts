@@ -29,6 +29,7 @@ test('LSP server e2e: initialize and diagnostics', { skip: !existsSync(serverBun
       const msg = JSON.parse(buf.slice(headerEnd + 4, headerEnd + 4 + len).toString());
       buf = buf.slice(headerEnd + 4 + len);
       if (msg.id === 1) capabilities = msg.result?.capabilities;
+      if (msg.id !== undefined) messages.push(msg);
       if (msg.method === 'textDocument/publishDiagnostics') published.push(msg.params);
     }
   });
@@ -43,9 +44,12 @@ test('LSP server e2e: initialize and diagnostics', { skip: !existsSync(serverBun
   const dir = await mkdtemp(join(tmpdir(), 'milkshake-lsp-e2e-'));
   const file = join(dir, 'a.mksk');
   await writeFile(join(dir, 'vars.ts'), 'export default { gold: 7 };\n');
-  await writeFile(file, ':: A\n[[去->Nowhere]]\n');
+  await writeFile(file, ':: A\n[[去->Nowhere]]\n<<goto "Nowhere">>\n');
   const uri = pathToFileURL(file).href;
-  const text = ':: A\n[[去->Nowhere]]\n';
+  const text = ':: A\n[[去->Nowhere]]\n<<goto "Nowhere">>\n';
+
+  const messages: any[] = [];
+  let hover: any = null;
 
   try {
     send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} } });
@@ -53,14 +57,26 @@ test('LSP server e2e: initialize and diagnostics', { skip: !existsSync(serverBun
     send({ jsonrpc: '2.0', method: 'initialized', params: {} });
     send({ jsonrpc: '2.0', method: 'textDocument/didOpen', params: { textDocument: { uri, languageId: 'milkshake', version: 1, text } } });
     await new Promise(r => setTimeout(r, 4000));
+    // Hover on `<<goto` (line 2, character 2) to exercise the signature hover.
+    send({ jsonrpc: '2.0', id: 2, method: 'textDocument/hover', params: { textDocument: { uri }, position: { line: 2, character: 3 } } });
+    await new Promise(r => setTimeout(r, 1500));
 
     assert.ok(capabilities, `no initialize response; server stderr: ${stderr.join('')}`);
     assert.equal(capabilities.definitionProvider, true);
+    assert.equal(capabilities.hoverProvider, true);
     assert.ok(capabilities.completionProvider);
     const issues = published.flatMap(p => (p.uri === uri ? p.diagnostics : []));
     assert.ok(
       issues.some(d => d.message.includes('Nowhere')),
       `expected a missing-target diagnostic, got: ${JSON.stringify(published)}`,
+    );
+    const hoverMsg = messages.find(m => m.id === 2);
+    assert.ok(hoverMsg, `no hover response; server stderr: ${stderr.join('')}`);
+    hover = hoverMsg.result;
+    const hoverText = JSON.stringify(hover?.contents);
+    assert.ok(
+      hoverText.includes('<<goto>>') && hoverText.includes('passage: string'),
+      `expected goto signature in hover, got: ${hoverText}`,
     );
   } finally {
     child.kill();

@@ -14,6 +14,7 @@ import { computeDiagnostics } from './diagnostics.js';
 import { cachedStoryInfo } from './storyInfo.js';
 import { completeAt } from './completion.js';
 import { definitionAt } from './definition.js';
+import { hoverAt } from './hover.js';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
@@ -32,6 +33,7 @@ connection.onInitialize((_params: InitializeParams) => ({
     textDocumentSync: TextDocumentSyncKind.Full,
     completionProvider: { triggerCharacters: ['<', '[', '$', '"', "'", ' '] },
     definitionProvider: true,
+    hoverProvider: true,
   },
 }));
 
@@ -101,6 +103,19 @@ connection.onDefinition(async params => {
     return await definitionAt(root, doc, params.position);
   } catch (err) {
     connection.console.error(`Milkshake definition failed: ${err}`);
+    return null;
+  }
+});
+
+connection.onHover(async params => {
+  const doc = documents.get(params.textDocument.uri);
+  if (!doc) return null;
+  const root = findStoryRoot(fileURLToPath(doc.uri));
+  if (!root) return null;
+  try {
+    return hoverAt(doc, params.position, await cachedStoryInfo(root));
+  } catch (err) {
+    connection.console.error(`Milkshake hover failed: ${err}`);
     return null;
   }
 });
