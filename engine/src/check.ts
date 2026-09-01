@@ -146,21 +146,6 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
 
   const checkMacro = (passage: string, n: Extract<Node, { kind: 'macro' }>, locals: Set<string>) => {
     if (n.name === 'if') return; // Branch tests are checked during traversal.
-    if (n.name === 'goto' || n.name === 'display') {
-      const lit = stringLiteral(n.args);
-      if (lit !== null && !titles.has(lit)) {
-        issues.push({ passage, message: `<<${n.name}>> 目标「${lit}」不存在` });
-      }
-      return;
-    }
-    if (n.name === 'link') {
-      // <<link "label">>Target<</link>>: the rendered content is the target.
-      const target = linkBlockTarget(n);
-      if (target !== null && !titles.has(target)) {
-        issues.push({ passage, message: `<<link>> 目标「${target}」不存在` });
-      }
-      return;
-    }
     if (n.name === 'for') {
       const a = n.args.trim();
       const m = a.match(/^\w+\s+(?:of|in)\s+(.+)$/);
@@ -186,17 +171,38 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
       }
       return;
     }
-    if (n.name === 'button' || n.name === 'script') {
-      // Raw content becomes link setup / inline code at runtime.
+    if (n.name === 'script') {
+      // Raw content becomes inline code at runtime.
       const code = (n.content ?? []).map(x => (x.kind === 'text' ? x.text : '')).join('');
       addExpr(passage, 'stmt', code, locals);
       return;
     }
-    if (knownMacros.has(n.name)) {
-      const sig = macroSigs.get(n.name);
-      if (sig) checkSignature(passage, n, sig, locals);
+    // goto / display / link / button also carry a signature; check the args,
+    // and additionally validate literal navigation targets.
+    const sig = macroSigs.get(n.name);
+    if (sig) checkSignature(passage, n, sig, locals);
+    if (n.name === 'goto' || n.name === 'display') {
+      const lit = stringLiteral(n.args);
+      if (lit !== null && !titles.has(lit)) {
+        issues.push({ passage, message: `<<${n.name}>> 目标「${lit}」不存在` });
+      }
       return;
     }
+    if (n.name === 'link') {
+      // <<link "label">>Target<</link>>: the rendered content is the target.
+      const target = linkBlockTarget(n);
+      if (target !== null && !titles.has(target)) {
+        issues.push({ passage, message: `<<link>> 目标「${target}」不存在` });
+      }
+      return;
+    }
+    if (n.name === 'button') {
+      // Raw content becomes link setup at runtime.
+      const code = (n.content ?? []).map(x => (x.kind === 'text' ? x.text : '')).join('');
+      addExpr(passage, 'stmt', code, locals);
+      return;
+    }
+    if (knownMacros.has(n.name)) return;
     // Mirrors runtime behavior: unknown <<name args>> is executed as code.
     addExpr(passage, 'stmt', n.args ? `${n.name} ${n.args}` : n.name, locals);
   };

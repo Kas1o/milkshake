@@ -226,3 +226,17 @@ test('widget calls with typed params are type-checked', async () => {
     },
   );
 });
+
+test('core macro args are type-checked (goto/button labels must be strings)', async () => {
+  await withStory(
+    {
+      'vars.ts': VARS,
+      'a.mksk': ':: A\n<<goto 123>>\n<<button 999>>gold = 5<</button>>\n',
+    },
+    issues => {
+      const msgs = issues.map(i => i.message);
+      assert.equal(issues.length, 2);
+      assert.ok(msgs.some(m => m.includes("not assignable to parameter of type 'string'")));
+    },
+  );
+});
