@@ -97,3 +97,13 @@ test('check flags duplicate passage titles', async () => {
     },
   );
 });
+
+test('check does not flag the loop var of a JS-style for', async () => {
+  await withStory(
+    {
+      'vars.ts': 'export default { n: 5 };\n',
+      'a.mksk': ':: A\n<<for i = 0; i < n; i++>>${i}<</for>>\n',
+    },
+    issues => assert.deepEqual(issues, []),
+  );
+});

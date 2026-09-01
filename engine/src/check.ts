@@ -113,8 +113,17 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
         const m2 = a.match(/^\w+\s+(?:from|upto|until|to|downto)\s+(.+)$/);
         if (m2) addExpr(passage, 'expr', m2[1], locals);
         else {
+          // C-style: `i = 0; i < n; i++`. The loop var is declared as a local
+          // at runtime, so the cond / step / init snippets must see it too.
           const parts = splitTopSemicolons(a);
-          if (parts[1]?.trim()) addExpr(passage, 'expr', parts[1], locals);
+          const lv = forLoopVar(a);
+          const loopLocals = lv ? new Set<string>(locals).add(lv) : locals;
+          if (parts[1]?.trim()) addExpr(passage, 'expr', parts[1], loopLocals);
+          if (parts[2]?.trim()) addExpr(passage, 'expr', parts[2], loopLocals);
+          if (parts[0]?.trim() && !/^\s*[A-Za-z_$][\w$]*\s*=/.test(parts[0])) {
+            // init with real logic (e.g. `i = seed()`), not a bare decl.
+            addExpr(passage, 'expr', parts[0], loopLocals);
+          }
         }
       }
       return;
