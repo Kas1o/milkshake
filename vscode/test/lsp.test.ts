@@ -44,9 +44,10 @@ test('LSP server e2e: initialize and diagnostics', { skip: !existsSync(serverBun
   const dir = await mkdtemp(join(tmpdir(), 'milkshake-lsp-e2e-'));
   const file = join(dir, 'a.mksk');
   await writeFile(join(dir, 'vars.ts'), 'export default { gold: 7 };\n');
-  // Disk is VALID; the open (unsaved) document carries the error. Diagnostics
-  // must come from the in-memory content, not the stale on-disk copy.
-  await writeFile(file, ':: A\nok\n<<goto "Nowhere">>\n');
+  // Disk is VALID; only the open (unsaved) document carries the error. The
+  // diagnostic must come from the in-memory content — if the override were
+  // broken it would silently fall back to the clean on-disk copy.
+  await writeFile(file, ':: A\nok\n');
   const uri = pathToFileURL(file).href;
   const text = ':: A\nok\n<<goto "Nowhere">>\n';
 
@@ -70,7 +71,7 @@ test('LSP server e2e: initialize and diagnostics', { skip: !existsSync(serverBun
     const issues = published.flatMap(p => (p.uri === uri ? p.diagnostics : []));
     assert.ok(
       issues.some(d => d.message.includes('Nowhere')),
-      `expected a missing-target diagnostic from the UNSAVED edit, got: ${JSON.stringify(published)}`,
+      `expected a missing-target diagnostic from the UNSAVED edit (in-memory), got: ${JSON.stringify(published)}`,
     );
     const hoverMsg = messages.find(m => m.id === 2);
     assert.ok(hoverMsg, `no hover response; server stderr: ${stderr.join('')}`);
