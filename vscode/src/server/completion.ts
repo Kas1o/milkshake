@@ -3,6 +3,16 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import { BUILTIN_HELPER_NAMES, type StoryInfo } from '../../../engine/src/check.js';
 import { detectCompletionContext } from '../shared/context.js';
 
+/** Short, human-readable parameter list for a macro, e.g. `amount: number`. */
+function signatureDetail(info: StoryInfo, name: string, fallback: string): string {
+  const sig = info.macroSigs.get(name);
+  const params = sig?.params;
+  if ((!params || !params.length) && !sig?.rest) return fallback;
+  const parts = (params ?? []).map(p => `${p.name}${p.optional ? '?' : ''}: ${p.type}`);
+  if (sig?.rest) parts.push(`...${sig.rest.name}: ${sig.rest.type}`);
+  return `${fallback}(${parts.join(', ')})`;
+}
+
 export async function completeAt(
   doc: TextDocument,
   position: Position,
@@ -17,7 +27,7 @@ export async function completeAt(
       return [...info.knownMacros].map(name => ({
         label: name,
         kind: CompletionItemKind.Function,
-        detail: info.widgets.has(name) ? 'widget' : 'macro',
+        detail: signatureDetail(info, name, info.widgets.has(name) ? 'widget' : 'macro'),
       }));
     case 'passage-title':
       return [...info.titles].map(title => ({

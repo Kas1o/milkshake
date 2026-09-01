@@ -257,7 +257,9 @@ gold += x;
 <</widget>>
 ```
 
-`<<widget>>` 定义一个可复用的片段宏，之后可直接调用 `<<名称 实参...>>`。
+`<<widget>>` 定义一个可复用的片段宏，之后可直接调用 `<<名称 实参...>>`。参数可声明类型：`<<widget "stat" value:number>>`，则调用 `<<stat ...>>` 时会做参数类型检查。
+
+> 宏的参数会在**编译期**被校验：脚本里注册的宏若声明了 `signature`（见 §7.3），`milkshake check` / LSP 会对每次调用的**参数个数**与**参数类型**做检查，把宏用错提前到编译期而非运行时报错。示例 `story/scripts/custom-macros.ts` 展示了 `heal` / `enemy` / `battle` 等宏的签名写法。
 
 ### 5.6 内建作用域（可在表达式中直接使用）
 
@@ -349,12 +351,15 @@ StoryLayout.render(ctrl, result) → DOM
 ### 7.3 宏系统（`macros.ts` + `engine.ts`）
 
 - 核心宏在 `coreMacros` 数组中，构造 `Engine` 时全部注册。
-- 每个宏是 `MacroDef { name, block?, raw?, run(ctx) }`。
+- 每个宏是 `MacroDef { name, block?, raw?, signature?, run(ctx) }`。
   - `block: true` → 解析器视其为块级宏，内容作为 `content` 传入；
   - `raw: true` → 内容按原文处理（不解析内部宏/插值），如 `script`、`button`。
+  - `signature` → **编译期签名**（可选）。描述宏接受的参数（`params` / `rest`，每个参数含 `name` / `type` / `optional`）。有签名时，`milkshake check` 与 LSP 会**在编译期校验调用**：参数个数，以及每个实参表达式是否可赋值给声明的类型——把「宏用错」从运行时错误提前到编译期。`type` 是 TS 类型字符串，会相对故事 `vars.ts` 解析（可用 `number` / `string` / `Drink` / `Drink[]` / `typeof __vars["gold"]` 等）。
 - `MacroContext` 提供：`eval` / `evalStr`（求值表达式）、`runScript`（执行语句）、`render`（渲染子节点）、`emitLink`（产出链接）、`navigate`（跳转）、`stop`、`declareLocal`。
 - `run` 可返回字符串（追加到输出）或 Promise（支持异步宏，如阻塞式战斗弹窗 `battle`）。
-- 未知宏名在渲染时被当作代码尝试执行（兼容 `<<gold += 1>>` 这类简写）。
+- 未知宏名在渲染时被当作代码尝试执行（兼容 `<<gold += 1>>` 这类简写）；在 `milkshake check` 里，真正未知的宏名会以「未定义标识符」类型错误的形式在编译期报出。
+
+`<<widget>>` 定义也可带类型：`<<widget "stat" value:number>>`，之后 `<<stat 42>>` 会对 `value` 做类型检查。
 
 ### 7.4 解析器（`parser.ts`）
 

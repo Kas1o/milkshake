@@ -114,6 +114,7 @@ function openBattleModal(config: {
 export function install(ctx: StoryContext<StoryVars>) {
   ctx.registerMacro({
     name: 'heal',
+    signature: { description: '恢复体力', params: [{ name: 'amount', type: 'number' }] },
     run: c => {
       const v = ctx.variables;
       v.hp = Math.min(v.hp + Number(c.eval(c.args) || 0), v.maxhp);
@@ -123,6 +124,7 @@ export function install(ctx: StoryContext<StoryVars>) {
 
   ctx.registerMacro({
     name: 'quest',
+    signature: { description: '设置当前目标', params: [{ name: 'goal', type: 'string' }] },
     run: c => {
       const goal = c.evalStr(c.args);
       ctx.variables.flags.quest = goal;
@@ -133,6 +135,14 @@ export function install(ctx: StoryContext<StoryVars>) {
   ctx.registerMacro({
     name: 'enemy',
     block: true,
+    signature: {
+      description: '在段落中宣告一个敌人（block），首次进入时写入战斗状态。',
+      params: [
+        { name: 'name', type: 'string' },
+        { name: 'hp', type: 'number' },
+        { name: 'gold', type: 'number', optional: true },
+      ],
+    },
     run: async c => {
       const toks = c.args.trim().split(/\s+/);
       const name = c.evalStr(toks[0] ?? '""');
@@ -151,6 +161,7 @@ export function install(ctx: StoryContext<StoryVars>) {
 
   ctx.registerMacro({
     name: 'prompt',
+    signature: { description: '询问玩家输入', params: [{ name: 'question', type: 'string' }] },
     run: async c => {
       const ask = c.engine.ask;
       if (!ask) throw new Error('<<prompt>> requires engine.ask (set it in the host application)');
@@ -162,6 +173,10 @@ export function install(ctx: StoryContext<StoryVars>) {
 
   ctx.registerMacro({
     name: 'battle',
+    signature: {
+      description: '阻塞式旁路战斗',
+      params: [{ name: 'spec', type: '{ enemy: string; hp: number; gold: number }' }],
+    },
     run: async c => {
       // 阻塞式旁路战斗：弹窗自己跑完，结果写回上下文。
       const spec = c.eval(c.args) as { enemy: string; hp: number; gold: number };

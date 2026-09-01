@@ -24,6 +24,28 @@ export interface MacroDef {
   block?: boolean;
   raw?: boolean;
   run(ctx: MacroContext): void | string | Promise<void | string>;
+  /**
+   * Compile-time description of the arguments this macro accepts. When present,
+   * the static checker (`check.ts`) validates call arity and argument types so
+   * mistakes surface in `milkshake check` / the LSP instead of at runtime.
+   * `type` is a TS type string, resolved against the story's `vars.ts` exports
+   * (e.g. `'number'`, `'string'`, `'Drink'`, `'typeof __vars["gold"]'`).
+   */
+  signature?: MacroSignature;
+}
+
+export interface MacroParam {
+  name: string;
+  type: string;
+  optional?: boolean;
+  description?: string;
+}
+
+export interface MacroSignature {
+  description?: string;
+  params?: MacroParam[];
+  /** Trailing variadic argument (e.g. `...args: string[]`). */
+  rest?: MacroParam;
 }
 
 export function truthy(v: unknown): boolean {
@@ -82,12 +104,21 @@ export function splitTopSemicolons(s: string): string[] {
 export const coreMacros: MacroDef[] = [
   { name: 'set', run: ctx => { ctx.runScript(ctx.args); return ''; } },
   { name: 'run', run: ctx => { ctx.runScript(ctx.args); return ''; } },
-  { name: 'print', run: ctx => ctx.evalStr(ctx.args) },
-  { name: '=', run: ctx => ctx.evalStr(ctx.args) },
+  {
+    name: 'print',
+    signature: { params: [{ name: 'value', type: 'unknown' }] },
+    run: ctx => ctx.evalStr(ctx.args),
+  },
+  {
+    name: '=',
+    signature: { params: [{ name: 'value', type: 'unknown' }] },
+    run: ctx => ctx.evalStr(ctx.args),
+  },
   { name: 'comment', run: () => '' },
   { name: 'stop', run: ctx => { ctx.stop(); return ''; } },
   {
     name: 'display',
+    signature: { params: [{ name: 'passage', type: 'string' }] },
     run: ctx => {
       const name = ctx.evalStr(ctx.args);
       const pass = ctx.engine.getPassage(name);
@@ -95,7 +126,11 @@ export const coreMacros: MacroDef[] = [
       return ctx.render(ctx.engine.nodesFor(pass));
     },
   },
-  { name: 'goto', run: ctx => { ctx.navigate(ctx.evalStr(ctx.args)); return ''; } },
+  {
+    name: 'goto',
+    signature: { params: [{ name: 'passage', type: 'string' }] },
+    run: ctx => { ctx.navigate(ctx.evalStr(ctx.args)); return ''; },
+  },
   { name: 'return', run: ctx => { ctx.navigate('__back__'); return ''; } },
   { name: 'back', run: ctx => { ctx.navigate('__back__'); return ''; } },
   {
@@ -195,6 +230,7 @@ export const coreMacros: MacroDef[] = [
   {
     name: 'link',
     block: true,
+    signature: { params: [{ name: 'label', type: 'string' }] },
     run: async ctx => {
       const label = ctx.evalStr(ctx.args);
       const target = (await ctx.render(ctx.content ?? [])).trim();
@@ -206,6 +242,7 @@ export const coreMacros: MacroDef[] = [
     name: 'button',
     block: true,
     raw: true,
+    signature: { params: [{ name: 'label', type: 'string' }] },
     run: ctx => {
       const label = ctx.evalStr(ctx.args);
       return ctx.emitLink({ kind: 'button', label, setup: rawText(ctx.content) });

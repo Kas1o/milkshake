@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
 import { Engine, makeContext } from './engine/engine.js';
-import { coreMacros, splitTopSemicolons } from './engine/macros.js';
+import { coreMacros, splitTopSemicolons, type MacroSignature, type MacroParam } from './engine/macros.js';
 import { parseNodes, splitArgs } from './engine/parser.js';
 import { walk, parsePassageFile, loadVars, isSpecialScript, importTsFile, resolveStoryDir } from './engine/story.js';
 import type { Node, PassageSource } from './types.js';
@@ -20,10 +20,13 @@ export interface CheckIssue {
 }
 
 interface ExprSnippet {
-  /** 'expr' wraps as return (...); 'stmt' is used as a function body. */
-  mode: 'expr' | 'stmt';
+  /** 'expr' wraps as return (...); 'stmt' is used as a function body;
+   * 'checktype' asserts the expression is assignable to `expected`. */
+  mode: 'expr' | 'stmt' | 'checktype';
   code: string;
   locals: ReadonlySet<string>;
+  /** For 'checktype': the TS type the expression must be assignable to. */
+  expected?: string;
 }
 
 const CORE_BLOCK_MACROS = new Set(coreMacros.filter(m => m.block).map(m => m.name));
@@ -68,7 +71,8 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
   }
 
   // Locate <<widget>> definitions for arity checks and param scoping.
-  const widgets = new Map<string, string[]>();
+  const widgets = new Map<string, MacroParam[]>();
+  const widgetParamNames = new Map<string, string[]>();
   for (const [title, nodes] of parsed) {
     for (const n of allNodes(nodes)) {
       if (n.kind !== 'macro' || n.name !== 'widget') continue;
@@ -78,7 +82,15 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
         continue;
       }
       widgets.set(w.name, w.params);
+      widgetParamNames.set(w.name, w.params.map(p => p.name));
     }
+  }
+  // Unified call signatures: core macros + story-registered macros + widgets.
+  const macroSigs = new Map<string, MacroSignature>();
+  for (const m of coreMacros) if (m.signature) macroSigs.set(m.name, m.signature);
+  for (const [n, s] of scriptInfo.macroSigs) macroSigs.set(n, s);
+  for (const [name, params] of widgets) {
+    macroSigs.set(name, { params });
   }
   const knownMacros = new Set([...CORE_MACRO_NAMES, ...widgets.keys(), ...scriptInfo.macros]);
 
@@ -87,20 +99,65 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
   const vars = hasVars ? await loadVars(dir) : undefined;
 
   const snippets = new Map<string, ExprSnippet[]>();
-  const addExpr = (passage: string, mode: 'expr' | 'stmt', code: string, locals: ReadonlySet<string>) => {
+  const addExpr = (
+    passage: string,
+    mode: 'expr' | 'stmt' | 'checktype',
+    code: string,
+    locals: ReadonlySet<string>,
+    expected?: string,
+  ) => {
     if (!code.trim()) return;
     let list = snippets.get(passage);
     if (!list) snippets.set(passage, (list = []));
-    list.push({ mode, code, locals });
+    list.push({ mode, code, locals, expected });
+  };
+
+  /** Validate a macro call's arity and, when types are declared, type-check
+   * each argument so mistakes surface at compile time, not runtime. */
+  const checkSignature = (
+    passage: string,
+    n: Extract<Node, { kind: 'macro' }>,
+    sig: MacroSignature,
+    locals: Set<string>,
+  ) => {
+    if (!sig.params?.length && !sig.rest) return;
+    const args = splitArgs(n.args);
+    const fixed = sig.params ?? [];
+    const minRequired = fixed.filter(p => !p.optional).length;
+
+    if (args.length < minRequired) {
+      issues.push({
+        passage,
+        message: `<<${n.name}>> 需要至少 ${minRequired} 个参数，实际给了 ${args.length} 个`,
+      });
+    } else if (!sig.rest && args.length > fixed.length) {
+      issues.push({
+        passage,
+        message: `<<${n.name}>> 最多接受 ${fixed.length} 个参数，实际给了 ${args.length} 个`,
+      });
+    }
+
+    for (let i = 0; i < args.length; i++) {
+      const p = fixed[i] ?? sig.rest;
+      if (!p?.type || p.type === 'unknown' || p.type === 'any') continue;
+      addExpr(passage, 'checktype', args[i], locals, p.type);
+    }
   };
 
   const checkMacro = (passage: string, n: Extract<Node, { kind: 'macro' }>, locals: Set<string>) => {
-    if (n.name === 'widget') return;
     if (n.name === 'if') return; // Branch tests are checked during traversal.
     if (n.name === 'goto' || n.name === 'display') {
       const lit = stringLiteral(n.args);
       if (lit !== null && !titles.has(lit)) {
         issues.push({ passage, message: `<<${n.name}>> 目标「${lit}」不存在` });
+      }
+      return;
+    }
+    if (n.name === 'link') {
+      // <<link "label">>Target<</link>>: the rendered content is the target.
+      const target = linkBlockTarget(n);
+      if (target !== null && !titles.has(target)) {
+        issues.push({ passage, message: `<<link>> 目标「${target}」不存在` });
       }
       return;
     }
@@ -136,16 +193,8 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
       return;
     }
     if (knownMacros.has(n.name)) {
-      const params = widgets.get(n.name);
-      if (params) {
-        const given = splitArgs(n.args).length;
-        if (given !== params.length) {
-          issues.push({
-            passage,
-            message: `<<${n.name}>> 需要 ${params.length} 个参数，实际给了 ${given} 个`,
-          });
-        }
-      }
+      const sig = macroSigs.get(n.name);
+      if (sig) checkSignature(passage, n, sig, locals);
       return;
     }
     // Mirrors runtime behavior: unknown <<name args>> is executed as code.
@@ -186,7 +235,7 @@ export async function checkStory(dir: string): Promise<CheckIssue[]> {
   for (const [title, nodes] of parsed) {
     // Widget params declared passage-wide: looser than true scoping, but
     // keeps the checker free of false positives.
-    const locals = new Set<string>([...widgets.values()].flat());
+    const locals = new Set<string>([...widgetParamNames.values()].flat());
     visit(title, nodes, locals);
   }
 
@@ -226,11 +275,19 @@ function passageLocations(sources: PassageSource[]): Map<string, PassageLocation
   return map;
 }
 
-function widgetDef(n: Node): { name: string; params: string[] } | null {
+function widgetDef(n: Node): { name: string; params: MacroParam[] } | null {
   if (n.kind !== 'macro' || n.name !== 'widget') return null;
   const toks = splitArgs(n.args);
   const name = toks[0] ? stripQuotes(toks[0]) : '';
-  return name ? { name, params: toks.slice(1) } : null;
+  if (!name) return null;
+  const params: MacroParam[] = toks.slice(1).map(tok => {
+    // `name` or `name:type` (type resolved against vars.ts, defaults to any).
+    const colon = tok.indexOf(':');
+    const [rawName, type] =
+      colon > 0 ? [tok.slice(0, colon), tok.slice(colon + 1)] : [tok, ''];
+    return { name: rawName, type: type || 'unknown' };
+  });
+  return { name, params };
 }
 
 /** Depth-first visit of every node in a tree, including block bodies. */
@@ -248,9 +305,11 @@ function* allNodes(nodes: Node[]): Generator<Node, void, undefined> {
 export interface StoryInfo {
   titles: Set<string>;
   locations: Map<string, PassageLocation>;
-  widgets: Map<string, string[]>;
+  widgets: Map<string, MacroParam[]>;
   /** Core macros + widgets + script-registered macros. */
   knownMacros: Set<string>;
+  /** Compile-time call signatures for macros (core + story + widgets). */
+  macroSigs: Map<string, MacroSignature>;
   /** Helpers registered by story scripts. */
   helpers: Set<string>;
   varNames: string[];
@@ -266,7 +325,7 @@ export async function collectStoryInfo(dir: string): Promise<StoryInfo> {
   const locations = passageLocations(sources);
   const scriptInfo = await cachedScriptInfo(dir);
   const blockMacros = new Set([...CORE_BLOCK_MACROS, ...scriptInfo.blockMacros]);
-  const widgets = new Map<string, string[]>();
+  const widgets = new Map<string, MacroParam[]>();
   for (const s of sources) {
     try {
       for (const n of allNodes(parseNodes(s.source, { blockMacros }))) {
@@ -278,12 +337,17 @@ export async function collectStoryInfo(dir: string): Promise<StoryInfo> {
     }
   }
   const knownMacros = new Set([...CORE_MACRO_NAMES, ...widgets.keys(), ...scriptInfo.macros]);
+  const macroSigs = new Map<string, MacroSignature>();
+  for (const m of coreMacros) if (m.signature) macroSigs.set(m.name, m.signature);
+  for (const [n, s] of scriptInfo.macroSigs) macroSigs.set(n, s);
+  for (const [name, params] of widgets) macroSigs.set(name, { params });
   const vars = existsSync(join(dir, 'vars.ts')) ? await loadVars(dir) : undefined;
   return {
     titles,
     locations,
     widgets,
     knownMacros,
+    macroSigs,
     helpers: scriptInfo.helpers,
     varNames: vars ? Object.keys(vars) : [],
   };
@@ -300,6 +364,15 @@ function stripQuotes(tok: string): string {
 function stringLiteral(args: string): string | null {
   const m = args.trim().match(/^(['"])(.*)\1$/);
   return m ? m[2] : null;
+}
+
+/** For `<<link "label">>Target<</link>>`, return the trimmed target text when
+ * it's a plain literal (single text node), or null when it's dynamic. */
+function linkBlockTarget(n: Extract<Node, { kind: 'macro' }>): string | null {
+  const c = n.content;
+  if (!c || c.length !== 1 || c[0].kind !== 'text') return null;
+  const t = c[0].text.trim();
+  return t ? t : null;
 }
 
 function forLoopVar(args: string): string | undefined {
@@ -331,6 +404,7 @@ interface CollectedScriptInfo {
   helpers: Set<string>;
   macros: Set<string>;
   blockMacros: Set<string>;
+  macroSigs: Map<string, MacroSignature>;
 }
 
 /** Importing + executing every story script is expensive (transpile + data-URL
@@ -370,6 +444,7 @@ async function collectScriptInfo(dir: string): Promise<CollectedScriptInfo> {
   const helpers = new Set<string>();
   const macros = new Set<string>();
   const blockMacros = new Set<string>();
+  const macroSigs = new Map<string, MacroSignature>();
   try {
     const scriptFiles = await walk(dir, p => /\.ts$/i.test(p) && !isSpecialScript(p));
     const engine = new Engine();
@@ -382,14 +457,15 @@ async function collectScriptInfo(dir: string): Promise<CollectedScriptInfo> {
       }
     }
     for (const n of (engine as any).helpers.keys() as Iterable<string>) helpers.add(n);
-    for (const [n, def] of (engine as any).macros as Map<string, { block?: boolean }>) {
+    for (const [n, def] of (engine as any).macros as Map<string, { block?: boolean; signature?: MacroSignature }>) {
       macros.add(n);
       if (def.block) blockMacros.add(n);
+      if (def.signature) macroSigs.set(n, def.signature);
     }
   } catch {
     // No scripts: nothing to collect.
   }
-  return { helpers, macros, blockMacros };
+  return { helpers, macros, blockMacros, macroSigs };
 }
 
 interface TypeCheckInput {
@@ -433,6 +509,7 @@ function typeCheckSnippets(input: TypeCheckInput): CheckIssue[] {
   );
   for (const h of input.helperNames) env.push(`  declare function ${h}(...args: any[]): any;`);
   const reserved = new Set([...input.varNames, ...input.helperNames, ...BUILTIN_HELPER_NAMES]);
+  const exportedTypes = exportedTypeNames(input.varsSource);
 
   const files = new Map<string, string>([[varsPath, input.varsSource]]);
   const origin = new Map<string, { passage: string; code: string }>();
@@ -447,10 +524,20 @@ function typeCheckSnippets(input: TypeCheckInput): CheckIssue[] {
         .filter(l => !reserved.has(l))
         .map(l => `  let ${l}: any;`)
         .join('\n');
-      const body = s.mode === 'expr' ? `    return (${s.code});` : indent(s.code);
+      let checkDecl = '';
+      let body: string;
+      if (s.mode === 'checktype') {
+        // `__checktype(arg)` asserts the argument is assignable to the macro's
+        // declared param type. Story type names resolve against vars.ts.
+        const type = resolveType(s.expected ?? 'unknown', exportedTypes);
+        checkDecl = `  declare function __checktype(p: ${type}): void;\n`;
+        body = `    __checktype(${s.code});`;
+      } else {
+        body = s.mode === 'expr' ? `    return (${s.code});` : indent(s.code);
+      }
       files.set(
         name,
-        `namespace __s${seq} {\n${env.join('\n')}\n${locals}\n  function __check() {\n${body}\n  }\n}\n`,
+        `namespace __s${seq} {\n${env.join('\n')}\n${locals}\n${checkDecl}  function __check() {\n${body}\n  }\n}\n`,
       );
       origin.set(name, { passage, code: s.code });
     }
@@ -546,6 +633,34 @@ function indent(code: string): string {
     .split('\n')
     .map(l => (l.trim() ? '  ' + l : l))
     .join('\n');
+}
+
+/** Names of `interface` / `type` exported from vars.ts, so macro signature
+ * types can reference them (e.g. `Drink`). */
+function exportedTypeNames(source: string): Set<string> {
+  const names = new Set<string>();
+  try {
+    const sf = ts.createSourceFile('vars.ts', source, ts.ScriptTarget.Latest, true);
+    for (const st of sf.statements) {
+      const mods = (st as ts.InterfaceDeclaration).modifiers;
+      if (mods?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) {
+        if (ts.isInterfaceDeclaration(st) || ts.isTypeAliasDeclaration(st)) {
+          names.add(st.name.text);
+        }
+      }
+    }
+  } catch {
+    // Fall back to no named types.
+  }
+  return names;
+}
+
+/** Turn a macro-signature type string into one that resolves in the snippet:
+ * bare story types (e.g. `Drink`) become `import('./story-vars').Drink`. */
+function resolveType(t: string, exported: Set<string>): string {
+  if (!exported.size) return t;
+  const re = new RegExp(`\\b(${[...exported].join('|')})\\b`, 'g');
+  return t.replace(re, `import('./story-vars').$1`);
 }
 
 // ---------------------------------------------------------------------------
