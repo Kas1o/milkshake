@@ -50,7 +50,8 @@ export const layout = {
     const captionEl = document.getElementById('story-caption');
     if (engine.getPassage('StoryCaption')) {
       const cap = await engine.renderPassage('StoryCaption');
-      captionEl.innerHTML = ctrl.md(cap.text);
+      captionEl.innerHTML = ctrl.inlineLinks(ctrl.md(cap.text), cap);
+      ctrl.bindLinks(captionEl, cap);
       captionEl.style.display = '';
     } else {
       captionEl.style.display = 'none';

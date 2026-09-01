@@ -132,7 +132,8 @@ export const layout: StoryLayout = {
     const captionEl = document.getElementById('story-caption')!;
     if (engine.getPassage('StoryCaption')) {
       const cap = await engine.renderPassage('StoryCaption');
-      captionEl.innerHTML = c.md(cap.text);
+      captionEl.innerHTML = c.inlineLinks(c.md(cap.text), cap);
+      c.bindLinks(captionEl, cap);
       captionEl.style.display = '';
     } else {
       captionEl.style.display = 'none';
