@@ -1,9 +1,50 @@
 /** Completion context detected from the text before the cursor. */
 export type CompletionContext =
   | { kind: 'macro-name'; prefix: string }
+  | { kind: 'macro-arg'; macro: string; argIndex: number }
   | { kind: 'passage-title'; prefix: string }
   | { kind: 'identifier' }
   | { kind: 'none' };
+
+/** Split macro args typed so far (quote/bracket aware), returning the arg at
+ * the cursor (or null if none / the cursor is on a fresh arg). */
+function typedArgs(text: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let quote = '';
+  let depth = 0;
+  for (const c of text) {
+    if (quote) {
+      cur += c;
+      if (c === '\\') continue;
+      if (c === quote) quote = '';
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') {
+      quote = c;
+      cur += c;
+      continue;
+    }
+    if (c === '(' || c === '[' || c === '{') {
+      depth++;
+      cur += c;
+      continue;
+    }
+    if (c === ')' || c === ']' || c === '}') {
+      if (depth > 0) depth--;
+      cur += c;
+      continue;
+    }
+    if (/\s/.test(c) && depth === 0) {
+      if (cur) out.push(cur);
+      cur = '';
+      continue;
+    }
+    cur += c;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
 
 export function detectCompletionContext(textBefore: string): CompletionContext {
   // <<goto "X" / <<display "X">: completing a passage title.
@@ -22,6 +63,16 @@ export function detectCompletionContext(textBefore: string): CompletionContext {
     // Right after << (or <</): completing the macro name itself.
     const name = inner.match(/^\/?\s*([A-Za-z_][\w-]*)?$/);
     if (name) return { kind: 'macro-name', prefix: name[1] ?? '' };
+    // Inside a macro's argument list — report the current parameter index so
+    // completions can be type-aware (e.g. suggest passage titles for strings).
+    const m = inner.match(/^\/?\s*([A-Za-z_][\w-]*)\s+(.*)$/);
+    if (m) {
+      const args = typedArgs(m[2]);
+      // A trailing space (or open quote) means the cursor is starting a new arg.
+      const startingNew = /[\s'"`([]{0,1}$/.test(m[2]) && /[\s]$/.test(m[2]);
+      const argIndex = startingNew ? args.length : Math.max(args.length - 1, 0);
+      return { kind: 'macro-arg', macro: m[1], argIndex };
+    }
     return { kind: 'identifier' };
   }
 

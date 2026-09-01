@@ -8,9 +8,14 @@ test('macro name completion right after <<', () => {
   assert.deepEqual(detectCompletionContext('<<set x = 1>> <</'), { kind: 'macro-name', prefix: '' });
 });
 
-test('identifier completion inside macro args and interpolation', () => {
-  assert.deepEqual(detectCompletionContext('<<if gol'), { kind: 'identifier' });
+test('identifier completion inside interpolation', () => {
   assert.deepEqual(detectCompletionContext('${na'), { kind: 'identifier' });
+});
+
+test('macro-arg completion reports the macro and current arg index', () => {
+  assert.deepEqual(detectCompletionContext('<<heal '), { kind: 'macro-arg', macro: 'heal', argIndex: 0 });
+  assert.deepEqual(detectCompletionContext('<<heal 5 '), { kind: 'macro-arg', macro: 'heal', argIndex: 1 });
+  assert.deepEqual(detectCompletionContext('<<if gol'), { kind: 'macro-arg', macro: 'if', argIndex: 0 });
 });
 
 test('passage title completion after -> and in goto/display', () => {

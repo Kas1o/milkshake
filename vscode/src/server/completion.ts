@@ -29,6 +29,29 @@ export async function completeAt(
         kind: CompletionItemKind.Function,
         detail: signatureDetail(info, name, info.widgets.has(name) ? 'widget' : 'macro'),
       }));
+    case 'macro-arg': {
+      // Suggest story vars / helpers / built-ins, plus passage titles when the
+      // current parameter is typed as a string (e.g. <<display "..." >>).
+      const items: CompletionItem[] = info.varNames.map(v => ({
+        label: v,
+        kind: CompletionItemKind.Variable,
+        detail: 'story var',
+      }));
+      for (const h of info.helpers) {
+        items.push({ label: h, kind: CompletionItemKind.Function, detail: 'helper' });
+      }
+      for (const h of BUILTIN_HELPER_NAMES) {
+        items.push({ label: h, kind: CompletionItemKind.Function, detail: 'builtin' });
+      }
+      const sig = info.macroSigs.get(ctx.macro);
+      const param = sig?.params?.[ctx.argIndex];
+      if (param?.type === 'string' || (sig?.rest?.type === 'string' && param === undefined)) {
+        for (const t of info.titles) {
+          items.push({ label: t, kind: CompletionItemKind.Reference, detail: 'passage' });
+        }
+      }
+      return items;
+    }
     case 'passage-title':
       return [...info.titles].map(title => ({
         label: title,
