@@ -41,6 +41,15 @@ hr { border: 0; border-top: 1px dashed #555; margin: 1.5em 0; }
 a.link { color: #7fd0ff; text-decoration: underline; cursor: pointer; }
 a.link:hover { color: #aee4ff; }
 
+/* 运行时错误面板（runStory 捕获渲染异常后渲染）。 */
+.engine-error { border: 1px solid #ff6b6b; border-radius: 8px; padding: 1em 1.2em; }
+.engine-error h2 { margin: 0 0 .4em; font-size: 1.1em; color: #ff8a8a; }
+.engine-error pre {
+  margin: 0; white-space: pre-wrap; word-break: break-word;
+  background: rgba(0,0,0,.3); border-radius: 4px; padding: .6em .8em;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .85em;
+}
+
 /* <<battle>> 阻塞式旁路弹窗（custom-macros.ts 的 openBattleModal 创建）。 */
 .battle-overlay {
   position: fixed; inset: 0; z-index: 100;

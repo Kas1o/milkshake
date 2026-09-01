@@ -242,7 +242,7 @@ gold += x;
 <<button "喝一口">>hp = Math.min(hp + 20, maxhp)<</button>>
 ```
 
-`<<button>>` 渲染一个按钮，点击后执行其内容（作为语句），并重渲染当前段落。
+`<<button>>` 渲染一个按钮，点击后执行其内容（作为语句），并重渲染当前段落（按钮点击不算导航，不会新增 history / turn）。
 
 #### 其它
 
@@ -273,7 +273,7 @@ gold += x;
 | `random([min], [max])` | 随机数（`random()` 0~1；`random(n)` 1..n；`random(a,b)` a..b） |
 | `dice([n])` | 掷骰子，默认 1..6 |
 | `set(k, v)` / `get(k)` / `has(k)` | 读 / 写 / 查故事变量 |
-| `str(v)` | 转为字符串 |
+| `str(v)` | 转为字符串（对象 / 数组输出 JSON，不再显示 `[object Object]`） |
 
 > 这些名字会遮蔽同名的故事变量。变量本身在表达式中直接按名字访问，无需加 `vars.` 前缀（`vars.gold` 与 `gold` 等价）。
 
@@ -289,7 +289,7 @@ gold += x;
 
 | npm 脚本 | 等价命令 | 作用 |
 | ---- | ---- | ---- |
-| `npm run check` | `milkshake check [目录]` | 静态检查：目标链接、widget 参数个数、类型错误、未声明变量 |
+| `npm run check` | `milkshake check [目录]` | 静态检查：目标链接、widget 参数个数、类型错误、未声明变量、重复段落标题 |
 | `npm run build` | `milkshake build [目录] [-o 目录]` | `check` + 用 esbuild 导出 Web 到 `web-dist/` |
 | `npm run dev` | `milkshake dev [目录] [-o 目录] [-p 端口]` | 构建 + 本地静态服务器 + 监听 `.mksk/.ts/.html/.css` 改动自动重构建 |
 | `npm run new -- <目录>` | `milkshake new <目录>` | 从模板初始化新故事项目 |
@@ -332,7 +332,7 @@ StoryLayout.render(ctrl, result) → DOM
 
 - **`Engine`**（`engine/src/engine/engine.ts`）：状态 + 注册表 + 渲染流程。对外 API：`start` / `transition` / `choose` / `renderPassage` / `renderCurrent` / `reset` / `registerMacro` / `registerHelper` / `addFilter` / `on`。
 - **`StoryState`**（`state.ts`）：`variables` / `history` / `visits` / `turns` / `current` / `previous`。
-- **`web/app.ts` 的 `runStory`**：浏览器端控制器——安装脚本、加载段落、导航 / 重新开始；布局可插拔。
+- **`web/app.ts` 的 `runStory`**：浏览器端控制器——安装脚本、加载段落、导航 / 重新开始；布局可插拔。渲染异常会被捕获并渲染为「运行时错误」面板（`engine-error`），而非静默卡死。
 - **`StoryLayout` / `StoryController` 接口**：定义自定义布局契约（`init` / `render` + `md` / `advance` / `restart` / `choose`）。默认 UI 在 `template/scripts/layout.ts`。
 
 ### 7.2 表达式求值（`expr.ts`）
@@ -371,7 +371,7 @@ StoryLayout.render(ctrl, result) → DOM
 
 1. 用一次性 `Engine` 安装故事脚本，收集脚本注册的助手与块级宏名（`collectScriptInfo`）；
 2. 以「核心块级宏 + 脚本块级宏」为集合解析全部段落；
-3. 校验：链接 / `<<goto>>` / `<<display>>` 目标是否存在、widget 参数个数、未知宏；
+3. 校验：链接 / `<<goto>>` / `<<display>>` 目标是否存在、widget 参数个数、未知宏、**重复段落标题**；
 4. 若存在 `vars.ts`，把所有表达式 / 语句片段收集后，用 `typescript` API 离线做类型检查（`typeCheckSnippets`）——每个片段放进独立 `namespace` 并 `declare` 变量与助手，避免与 lib.dom 全局冲突；
 5. 输出带段落、文件与行号定位的问题。
 

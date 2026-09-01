@@ -86,14 +86,31 @@ export async function runStory(bundle: StoryBundle): Promise<void> {
       }
     };
 
+  const showError = (err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    const el = document.getElementById('passages')!;
+    const div = document.createElement('div');
+    div.className = 'passage passage-in engine-error';
+    div.innerHTML = `<h2>⚠️ 运行时错误</h2><pre></pre>`;
+    (div.querySelector('pre') as HTMLElement).textContent = msg;
+    el.appendChild(div);
+    console.error(err);
+  };
+
   const rawAdvance = async () => {
-    let guardCount = 0;
-    while (engine.pendingNav) {
-      if (++guardCount > 200) break;
-      current = (await engine.consumePendingNav())!;
+    try {
+      let guardCount = 0;
+      while (engine.pendingNav) {
+        if (++guardCount > 200) break;
+        current = (await engine.consumePendingNav())!;
+      }
+      if (!current) current = await engine.renderCurrent();
+      await layout.render(ctrl, current);
+    } catch (err) {
+      // Surface runtime errors (unknown macro, bad expression, ...) instead
+      // of freezing the page with no feedback.
+      showError(err);
     }
-    if (!current) current = await engine.renderCurrent();
-    await layout.render(ctrl, current);
   };
   const advance = guard(rawAdvance);
 
