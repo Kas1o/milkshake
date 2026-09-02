@@ -48,7 +48,10 @@ npm test            # 含 LSP e2e 测试，需先 npm run build
 
 `init.ts` 流程：复制 base 模板 → 替换标题（story.config.ts / 00_ui.mksk）→ 依次 `resolveModules`（依赖展开、去重、按依赖排序）→
 `applyModules`（拷文件 + 打补丁，anchor 未命中会报错而非静默漏装）。交互模式用 `@inquirer/prompts` 询问标题与多选模块；
-非交互用 `--name` / `--with a,b`。首个样板模块：`save`（存档/读档，见 `engine/infra/save/`）。
+非交互用 `--name` / `--with a,b`。样板模块：`save`（存档/读档，见 `engine/infra/save/`）、`flow`（流程控制）、`interact`（输入交互）。
+
+`flow` 模块（`engine/infra/flow/`）拷入 `scripts/flow-macros.ts`，提供 `<<visitOnce>>`（整局一次块）、`<<ifVisited>>` / `<<ifNotVisited>>`（按段落访问分支）、`<<counter>>` / `<<resetCounter>>` 与 `count()` 助手；其状态存于 `variables._flow` 保留命名空间，随存档持久化、重开清零。
+`interact` 模块（`engine/infra/interact/`）拷入 `scripts/interact-macros.ts`，提供页面内联（非弹窗）控件 `<<ask>>` / `<<confirm>>` / `<<menu>>`；控件经引擎的 inline-embed 槽位机制（`ctx.emitHtml`）内联进正文、用 `<<button>>` 按钮重绘写入目标变量，一次性问答状态存 `variables._interact`。
 
 ## .mksk 剧本格式
 

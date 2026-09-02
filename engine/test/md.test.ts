@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mdToHtml, escapeHtml, inlineLinksToHtml } from '../src/web/md.js';
+import { mdToHtml, escapeHtml, inlineLinksToHtml, embedsToHtml } from '../src/web/md.js';
 
 test('escapeHtml escapes HTML metacharacters', () => {
   assert.equal(escapeHtml('<b>"a&b"</b>'), '&lt;b&gt;&quot;a&amp;b&quot;&lt;/b&gt;');
@@ -37,4 +37,12 @@ test('inlineLinksToHtml replaces sentinels with escaped anchors', () => {
     id => (id === 'L0' ? { label: '去 <市场>' } : { label: 'L1' }),
   );
   assert.equal(html, '<a href="#" class="link" data-link="L0">去 &lt;市场&gt;</a> 与 <a href="#" class="link" data-link="L1">L1</a>');
+});
+
+test('embedsToHtml replaces embed placeholders with raw html, after md', () => {
+  const md = mdToHtml('请填写：\uE010E0\uE011');
+  const html = embedsToHtml(md, id => (id === 'E0' ? { html: '<input class="mk-control">' } : undefined));
+  assert.equal(html, '<p>请填写：<input class="mk-control"></p>');
+  // Unknown embed ids are dropped cleanly.
+  assert.equal(embedsToHtml('<p>\uE010E9\uE011</p>', () => undefined), '<p></p>');
 });

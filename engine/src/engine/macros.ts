@@ -14,6 +14,10 @@ export interface MacroContext {
   runScript(code: string): void;
   render(nodes: Node[]): Promise<string>;
   emitLink(link: { kind: 'link' | 'button'; label: string; target?: string; setup?: string }): string;
+  /** Register a block of raw HTML to be inserted verbatim at this point in the
+   * output (bypassing markdown escaping). Returns the placeholder to emit, plus
+   * the stable id assigned to the embed (for later DOM lookups). */
+  emitHtml(html: string): { marker: string; id: string };
   navigate(target: string): void;
   stop(): void;
   declareLocal(name: string, value: unknown): void;

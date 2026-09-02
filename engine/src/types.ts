@@ -45,8 +45,17 @@ export interface Link {
   captured?: Record<string, unknown>;
 }
 
+/** A block of raw HTML a macro wants inserted verbatim into the rendered body
+ * (bypassing the markdown escaping that normal macro output goes through).
+ * Used by interact-style macros to embed live form controls inline. */
+export interface Embed {
+  id: string;
+  html: string;
+}
+
 export interface RenderResult {
   passage: string;
   text: string;
   links: Link[];
+  embeds: Embed[];
 }

@@ -1,6 +1,6 @@
 import { Engine, makeContext } from '../engine/engine.js';
 import type { RenderResult, Vars } from '../types.js';
-import { mdToHtml, inlineLinksToHtml } from './md.js';
+import { mdToHtml, inlineLinksToHtml, embedsToHtml } from './md.js';
 
 /** Navigation / rendering helpers handed to a layout. */
 export interface StoryController {
@@ -119,7 +119,10 @@ export async function runStory(bundle: StoryBundle): Promise<void> {
     md: mdToHtml,
     advance,
     inlineLinks: (html, result) =>
-      inlineLinksToHtml(html, id => result.links.find(l => l.id === id)),
+      embedsToHtml(
+        inlineLinksToHtml(html, id => result.links.find(l => l.id === id)),
+        id => result.embeds.find(e => e.id === id),
+      ),
     bindLinks: (root, result) => {
       root.querySelectorAll('a.link[data-link]').forEach(a => {
         a.addEventListener('click', ev => {

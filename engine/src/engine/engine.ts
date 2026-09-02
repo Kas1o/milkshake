@@ -3,7 +3,7 @@ import { createScope, evalExpression, runStatements } from './expr.js';
 import { parseNodes, splitArgs } from './parser.js';
 import { coreMacros, type MacroContext, type MacroDef } from './macros.js';
 import { Passage } from './passage.js';
-import type { Link, Node, PassageSource, RenderResult, StoryOptions, Vars } from '../types.js';
+import type { Embed, Link, Node, PassageSource, RenderResult, StoryOptions, Vars } from '../types.js';
 
 export interface StoryContext<T extends object = Vars> {
   engine: Engine<T>;
@@ -43,8 +43,18 @@ export function linkSentinel(id: string): string {
   return `${LINK_OPEN}${id}${LINK_END}`;
 }
 
+/** Inline raw-HTML embed placeholder markers (distinct PUA range from links). */
+export const EMBED_OPEN = '\uE010';
+export const EMBED_END = '\uE011';
+/** Matches an inline embed placeholder: EMBED_OPEN + id + EMBED_END. */
+export const EMBED_SENTINEL_RE = /[\uE010](E\d+)[\uE011]/g;
+export function embedSentinel(id: string): string {
+  return `${EMBED_OPEN}${id}${EMBED_END}`;
+}
+
 interface RendCollector {
   links: Link[];
+  embeds: Embed[];
   stopped: boolean;
 }
 
@@ -318,6 +328,11 @@ export class Engine<T extends object = Vars> {
         rc.links.push({ id, ...l, captured: engine.captureScope() });
         return linkSentinel(id);
       },
+      emitHtml: html => {
+        const id = 'E' + rc.embeds.length;
+        rc.embeds.push({ id, html });
+        return { marker: embedSentinel(id), id };
+      },
       navigate: (t: string) => {
         engine.pendingNav = t;
       },
@@ -335,9 +350,9 @@ export class Engine<T extends object = Vars> {
     const pass = this.passages.get(name);
     if (!pass) throw new Error(`no passage named "${name}"`);
     const scope = this.buildScope();
-    const rc: RendCollector = { links: [], stopped: false };
+    const rc: RendCollector = { links: [], embeds: [], stopped: false };
     const text = await this.renderNodes(this.nodesFor(pass), scope, name, rc);
-    const result: RenderResult = { passage: name, text, links: rc.links };
+    const result: RenderResult = { passage: name, text, links: rc.links, embeds: rc.embeds };
     result.text = this.applyFilters(result.text);
     return result;
   }
@@ -351,9 +366,9 @@ export class Engine<T extends object = Vars> {
     if (!pass) throw new Error(`no passage named "${name}"`);
     const nodes = this.nodesFor(pass);
     const scope = this.buildScope();
-    const rc: RendCollector = { links: [], stopped: false };
+    const rc: RendCollector = { links: [], embeds: [], stopped: false };
     const text = await this.renderNodes(nodes, scope, name, rc);
-    const result: RenderResult = { passage: name, text, links: rc.links };
+    const result: RenderResult = { passage: name, text, links: rc.links, embeds: rc.embeds };
     await this.emit('passage:after', { name, text, result });
     result.text = this.applyFilters(result.text);
     this.lastRender = result;
@@ -374,7 +389,7 @@ export class Engine<T extends object = Vars> {
       const init = this.passages.get('StoryInit');
       if (init) {
         const scope = this.buildScope();
-        const rc: RendCollector = { links: [], stopped: false };
+        const rc: RendCollector = { links: [], embeds: [], stopped: false };
         await this.renderNodes(this.nodesFor(init), scope, 'StoryInit', rc);
       }
     }

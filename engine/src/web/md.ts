@@ -6,6 +6,18 @@ export function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/** Replace inline embed placeholders with their registered raw HTML. Call AFTER
+ * mdToHtml (so embed HTML isn't markdown-escaped) and alongside link expansion. */
+export function embedsToHtml(
+  html: string,
+  embedById: (id: string) => { html: string } | undefined,
+): string {
+  return html.replace(/[\uE010](E\d+)[\uE011]/g, (m, id: string) => {
+    const e = embedById(id);
+    return e ? e.html : '';
+  });
+}
+
 /** Replace inline link placeholders (LINK_SENTINEL_RE) with real anchors. */
 export function inlineLinksToHtml(
   html: string,

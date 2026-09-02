@@ -235,3 +235,21 @@ test('async macro suspends rendering until its promise resolves (blocking side-c
   assert.equal(settled, true);
   assert.equal(r.text, 'startvictoryend');
 });
+
+test('macro emitHtml registers an inline embed in the render result', async () => {
+  const e = createEngine();
+  e.registerMacro({
+    name: 'field',
+    signature: { params: [{ name: 'label', type: 'string' }] },
+    run: c => {
+      const { marker } = c.emitHtml('<input class="mk-control">');
+      return `label:${marker}`;
+    },
+  });
+  e.loadPassages([P('start<<field "x">>end')]);
+  const r = await e.start();
+  assert.match(r.text, /label:[\uE010]E0[\uE011]/);
+  assert.equal(r.embeds.length, 1);
+  assert.equal(r.embeds[0].id, 'E0');
+  assert.equal(r.embeds[0].html, '<input class="mk-control">');
+});
