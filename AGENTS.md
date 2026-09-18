@@ -112,8 +112,9 @@ ${gold}                      // 表达式插值
 - LSP 服务器：`src/server/index.ts`（补全 / 跳转 / 诊断），客户端 `src/client.ts`。
 - 服务器通过 `../../../engine/src/check.js` 直接复用引擎的 `checkStory` / `collectStoryInfo`；`src/shared/locate.ts` 向上查找故事根（`vars.ts` 或 `story.config.ts` 所在目录）。
 - esbuild 打两个 CJS 包：`dist/client.js`（external `vscode`）、`dist/server.js`（external `typescript`）。
-- 调试：F5（`.vscode/launch.json`，preLaunchTask 先 `npm run build`）。
-- 改引擎或服务器代码后需 `npm run build` 再跑 e2e 测试。
+- 调试：F5（`.vscode/launch.json`，preLaunchTask 为后台 `watch` 任务，跑 `npm run watch`）。
+  开发模式下 `src/client.ts` 会监听 `dist/server.js`，重建后自动重启 LSP 服务器——因此改引擎 / 服务器代码无需手动 build 或 Reload Window。
+- 跑 e2e 测试前仍需 `npm run build`（测试直接加载 `dist/server.js`）。
 
 ## 代码风格
 

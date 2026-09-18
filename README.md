@@ -67,8 +67,10 @@ npm run build        # 产出 dist/client.js + dist/server.js
 然后在 VS Code 中：
 
 1. 打开该目录（`vscode/`）；
-2. 按 `F5` 启动「扩展开发宿主」（会先执行 preLaunchTask `npm run build`）；
+2. 按 `F5` 启动「扩展开发宿主」（会先执行后台 preLaunchTask `watch`，即 `npm run watch`）；
 3. 在新窗口里打开你的故事项目（含 `.mksk` 文件）即可获得语法高亮与 LSP 诊断。
+
+开发模式下，改动引擎（`engine/src/`）或 LSP 服务器代码后，`watch` 会自动重新打包，客户端监听到 `dist/server.js` 变化会自动重启语言服务器——无需手动 build，也无需 `Reload Window`。（若只改了 `dist/client.js` 对应的客户端代码，则仍需重载窗口。）
 
 ### 打包为 vsix 安装（可选）
 

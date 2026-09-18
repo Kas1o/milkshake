@@ -19,6 +19,7 @@ ${status()}
 <<link "睡上一觉（恢复体力，进入下一天）">>Sleep<</link>>
 <<button "喝一口招牌奶昔（恢复 20 体力）">>hp = Math.min(hp + 20, maxhp)<</button>>
 <<button "把小费投进罐子">>let _tip: number = dice(4); gold += _tip; lastTip = _tip<</button>>
+<<button "什么都不做">> navigate("Village") <</button>>
 
 <<if lastTip>>刚才罐子叮当一响，你投进了 ${lastTip} 金币。<</if>>
 
