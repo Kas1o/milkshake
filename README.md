@@ -242,7 +242,11 @@ gold += x;
 <<button "喝一口">>hp = Math.min(hp + 20, maxhp)<</button>>
 ```
 
-`<<button>>` 渲染一个按钮，点击后执行其内容（作为语句），并重渲染当前段落（按钮点击不算导航，不会新增 history / turn）。
+`<<button>>` 渲染一个按钮，点击后执行其内容（作为语句）。默认重渲染当前段落（不算导航，不新增 history / turn）；但内容里可调用 `navigate("目标")` / `back()` 主动跳转（此时按正常导航记 history / turn），或调用 `rerender()` 原地刷新。因此按钮内可写条件跳转：
+
+```mksk
+<<button "出发">>if (gold >= 20) navigate("Market"); else navigate("Home")<</button>>
+```
 
 #### 其它
 

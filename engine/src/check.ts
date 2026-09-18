@@ -35,6 +35,7 @@ const CORE_MACRO_NAMES = new Set(coreMacros.map(m => m.name));
 export const BUILTIN_HELPER_NAMES = [
   'vars', 'state', 'engine', 'passage', 'turns', 'history', 'visited',
   'random', 'dice', 'set', 'get', 'has', 'str',
+  'navigate', 'back', 'rerender',
 ];
 
 export interface CheckOptions {
@@ -565,6 +566,10 @@ function typeCheckSnippets(input: TypeCheckInput): CheckIssue[] {
     '  declare function get(key: string): unknown;',
     '  declare function has(key: string): boolean;',
     '  declare function str(value: unknown): string;',
+    // Navigation / render control available to click handlers and scripts.
+    '  declare function navigate(target: string): void;',
+    '  declare function back(): void;',
+    '  declare function rerender(): void;',
     // The remaining built-ins are plain values / engine handles, typed loosely
     // so `vars.gold`, `state.current`, `engine.options.name` all type-check.
     '  declare const vars: typeof __vars;',
@@ -573,7 +578,22 @@ function typeCheckSnippets(input: TypeCheckInput): CheckIssue[] {
       current?: string; previous?: string; visits: Map<string, number>;
       visited(name: string): number;
     };`,
-    '  declare const engine: { options: { name: string; start: string; uid?: string } };',
+    `  declare const engine: {
+      options: { name: string; start: string; uid?: string };
+      state: typeof state;
+      pendingNav: string | null;
+      readonly passageTitles: string[];
+      getPassage(name: string): {
+        title: string; tags: string[]; metadata: Record<string, string>;
+        source: string; file?: string;
+      } | undefined;
+      renderCurrent(): Promise<any>;
+      renderPassage(name: string): Promise<any>;
+      transition(target: string): Promise<any>;
+      start(name?: string): Promise<any>;
+      reset(): void;
+      stringify(value: unknown): string;
+    };`,
   );
   for (const h of input.helperNames) env.push(`  declare function ${h}(...args: any[]): any;`);
   const reserved = new Set([...input.varNames, ...input.helperNames, ...BUILTIN_HELPER_NAMES]);

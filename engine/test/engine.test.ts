@@ -138,6 +138,69 @@ test('button setup captures loop scope', async () => {
   assert.equal(e.state.variables['gold'], 3);
 });
 
+test('button can navigate the story from its setup', async () => {
+  const e = createEngine();
+  e.loadPassages([P('<<button "go">>navigate("Next")<</button>>'), P('arrived', 'Next')]);
+  const r1 = await e.start();
+  const r2 = (await e.choose(r1.links[0].id))!;
+  assert.equal(r2.text, 'arrived');
+  assert.equal(e.state.current, 'Next');
+  assert.equal(e.state.turns, 2, '导航型按钮应记一个 turn');
+  assert.deepEqual(e.state.history, ['Start', 'Next']);
+});
+
+test('button setup performs a conditional jump', async () => {
+  const e = createEngine();
+  e.loadPassages([
+    P('<<set gold = 25>><<button "go">>if (gold >= 20) navigate("Rich"); else navigate("Poor")<</button>>'),
+    P('rich', 'Rich'),
+    P('poor', 'Poor'),
+  ]);
+  const r1 = await e.start();
+  const r2 = (await e.choose(r1.links[0].id))!;
+  assert.equal(r2.text, 'rich');
+  assert.equal(e.state.current, 'Rich');
+});
+
+test('button back() returns to the previous passage', async () => {
+  const e = createEngine();
+  e.loadPassages([
+    P('start[[next->Next]]'),
+    P('here<<button "back">>back()<</button>>', 'Next'),
+  ]);
+  const r1 = await e.start();
+  const r2 = (await e.choose(r1.links[0].id))!;
+  const r3 = (await e.choose(r2.links[0].id))!;
+  assert.ok(r3.text.startsWith('start'));
+  assert.equal(e.state.current, 'Start');
+});
+
+test('link setup can override its declared target', async () => {
+  const e = createEngine();
+  e.loadPassages([
+    P('<<set ok = false>>[[go->Declared][if (!ok) navigate("Actual")]]'),
+    P('declared', 'Declared'),
+    P('actual', 'Actual'),
+  ]);
+  const r1 = await e.start();
+  const r2 = (await e.choose(r1.links[0].id))!;
+  assert.equal(r2.text, 'actual');
+  assert.equal(e.state.current, 'Actual');
+});
+
+test('rerender() keeps a link on the current passage', async () => {
+  const e = createEngine();
+  e.loadPassages([
+    P('<<if !has(\'n\')>><<set n = 0>><</if>>n=${n}[[stay->Next][n += 1; rerender()]]'),
+    P('next', 'Next'),
+  ]);
+  const r1 = await e.start();
+  const r2 = (await e.choose(r1.links[0].id))!;
+  assert.ok(r2.text.includes('n=1'));
+  assert.equal(e.state.current, 'Start');
+  assert.equal(e.state.turns, 1);
+});
+
 test('goto sets pending nav', async () => {
   const e = createEngine();
   e.loadPassages([P('<<goto "Next">>ignored'), P('arrived', 'Next')]);

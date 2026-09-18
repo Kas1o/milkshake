@@ -146,6 +146,21 @@ test('check knows the vars / state / engine built-ins', async () => {
   );
 });
 
+test('check knows the navigation / engine-state built-ins', async () => {
+  await withStory(
+    {
+      'vars.ts': VARS,
+      'a.mksk': [
+        ':: A',
+        '<<button "go">>if (gold >= 20) navigate("A"); else back(); rerender();<</button>>',
+        '${engine.pendingNav} ${engine.state.turns} ${engine.passageTitles.length}',
+        '',
+      ].join('\n'),
+    },
+    issues => assert.deepEqual(issues, []),
+  );
+});
+
 test('check flags a missing <<link>> block target', async () => {
   await withStory(
     {

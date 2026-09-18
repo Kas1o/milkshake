@@ -77,8 +77,8 @@ ${gold}                      // 表达式插值
 
 - 表达式 / 脚本可写 TypeScript（含类型注解、`as`），运行时用 TS transpile 后经 `with` + Proxy 作用域执行（`engine/src/engine/expr.ts`）。
 - 宏：核心宏见 `coreMacros`（`engine/src/engine/macros.ts`）。块级宏（`if`/`for`/`script`/`button`/`widget` 及脚本注册的）用 `<<name>><</name>>`、`<</name>>`、`endname` 闭合。
-- 链接 setup 在 `choose()` 时对捕获作用域执行；按钮（`button`）点击后重渲染当前段。
-- 引擎内建作用域：`vars`、`state`、`engine`、`passage`、`turns`、`history`、`visited`、`random`、`dice`、`set`、`get`、`has`、`str`（见 `BUILTIN_HELPER_NAMES`，`engine/src/check.ts`）。
+- 链接 / 按钮的 setup 在 `choose()` 时对捕获作用域执行，并由 handler 决定点击结果：调用 `navigate(t)` / `back()` 则走正常 `transition()`（记 history / turn），调用 `rerender()` 或按钮未表态则原地重渲染当前段；链接未表态时回退到其声明 target（`engine/src/engine/engine.ts` 的 `choose()`）。因此 `<<button>>` 内可写条件跳转，如 `if (gold >= 20) navigate('Rich'); else navigate('Poor')`。
+- 引擎内建作用域：`vars`、`state`、`engine`、`passage`、`turns`、`history`、`visited`、`random`、`dice`、`set`、`get`、`has`、`str`，以及点击 / 脚本可用的控制函数 `navigate`、`back`、`rerender`（见 `BUILTIN_HELPER_NAMES`，`engine/src/check.ts`）。
 - 特殊段落：`StoryInit`（开局前执行）、`StoryTitle` / `StoryCaption`（驱动 UI 栏）、tag `{start}` 标识起始段（实际起始由 `story.config.ts` 的 `start` 决定）。
 
 ## 故事项目约定（story/）

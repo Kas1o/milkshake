@@ -66,6 +66,7 @@ export class Engine<T extends object = Vars> {
   pendingNav: string | null = null;
   ask?: (prompt: string) => Promise<string>;
 
+  private rerenderRequested = false;
   private defaultVars?: T;
   private passages = new Map<string, Passage>();
   private macros = new Map<string, MacroDef>();
@@ -177,6 +178,19 @@ export class Engine<T extends object = Vars> {
       get: <K extends string & keyof T>(k: K): T[K] => this.state.variables[k],
       has: (k: string) => Object.prototype.hasOwnProperty.call(this.state.variables, k),
       str: (v: unknown) => this.stringify(v),
+      // Navigation / render control, available to click handlers (link/button
+      // setup) and scripts. A handler that calls `navigate`/`back` moves the
+      // story; one that calls `rerender` (or a button that does neither) stays
+      // put and redraws the current passage.
+      navigate: (target: string) => {
+        this.pendingNav = target;
+      },
+      back: () => {
+        this.pendingNav = '__back__';
+      },
+      rerender: () => {
+        this.rerenderRequested = true;
+      },
     };
     const helperNames = new Set(Object.keys(base));
     for (const [k, v] of this.helpers) {
@@ -400,6 +414,9 @@ export class Engine<T extends object = Vars> {
     if (!this.lastRender) return null;
     const link = this.lastRender.links.find(l => l.id === id);
     if (!link) return null;
+    // Clear the effect channels so we can observe what *this* click requests.
+    this.pendingNav = null;
+    this.rerenderRequested = false;
     if (link.setup) {
       if (link.captured) {
         const { base, helperNames } = this.buildBase();
@@ -414,12 +431,11 @@ export class Engine<T extends object = Vars> {
         this.runScript(link.setup);
       }
     }
-    if (link.kind === 'button') {
-      // A button isn't navigation: re-render the current passage in place
-      // without recording a new history entry / turn.
-      this.pendingNav = null;
-      return this.renderCurrent();
-    }
+    // The handler decides the outcome: an explicit navigate/back wins, then an
+    // explicit rerender; otherwise links follow their target and buttons redraw
+    // the current passage in place (no new history entry / turn).
+    if (this.pendingNav !== null) return this.consumePendingNav();
+    if (this.rerenderRequested || link.kind === 'button') return this.renderCurrent();
     return this.transition(link.target!);
   }
 
@@ -435,6 +451,7 @@ export class Engine<T extends object = Vars> {
     this.state = new StoryState<T>(this.freshVars());
     this.lastRender = null;
     this.pendingNav = null;
+    this.rerenderRequested = false;
     this.started = false;
   }
 
